@@ -458,13 +458,59 @@ async function loadPetInfo() {
     const response = await axios.get(`${apiBase}/pet/${playerId.value}`)
     if (response.data.success) {
       const data = response.data.data
-      pet.value = data.pet
+      
+      // 处理宠物数据，确保type包含完整信息
+      if (data.pet) {
+        // 如果type是字符串，转换为完整对象
+        if (typeof data.pet.type === 'string') {
+          const typeMap: {[key: string]: any} = {
+            'CAT': { name: 'CAT', displayName: '小猫咪', emoji: '🐱', description: '可爱的小猫，喜欢独立但也需要关爱' },
+            'DOG': { name: 'DOG', displayName: '小狗狗', emoji: '🐶', description: '忠诚的伙伴，活泼好动，需要更多的关注' },
+            'RABBIT': { name: 'RABBIT', displayName: '小兔子', emoji: '🐰', description: '温顺的小兔，喜欢安静的环境' },
+            'HAMSTER': { name: 'HAMSTER', displayName: '小仓鼠', emoji: '🐹', description: '活泼的小仓鼠，喜欢储存食物' },
+            'DRAGON': { name: 'DRAGON', displayName: '小龙', emoji: '🐲', description: '神秘的小龙，成长潜力巨大' },
+            'PANDA': { name: 'PANDA', displayName: '小熊猫', emoji: '🐼', description: '憨憨的小熊猫，喜欢吃竹子' },
+            'PENGUIN': { name: 'PENGUIN', displayName: '小企鹅', emoji: '🐧', description: '可爱的小企鹅，喜欢凉爽的环境' }
+          }
+          data.pet.type = typeMap[data.pet.type] || typeMap['CAT']
+        }
+        pet.value = data.pet
+      }
+      
       coins.value = data.coins
-      availableActions.value = data.availableActions
+      
+      // 处理动作数据，确保包含displayName和emoji
+      if (Array.isArray(data.availableActions)) {
+        if (data.availableActions.length > 0 && typeof data.availableActions[0] === 'string') {
+          // 如果是字符串数组，转换为完整对象
+          const actionMap: {[key: string]: any} = {
+            'FEED': { name: 'FEED', displayName: '喂食', emoji: '🍽️', description: '给宠物喂食，增加饱食度' },
+            'CLEAN': { name: 'CLEAN', displayName: '清洁', emoji: '🛁', description: '给宠物洗澡，增加清洁度' },
+            'PLAY': { name: 'PLAY', displayName: '玩耍', emoji: '🎾', description: '和宠物玩耍，增加快乐度但消耗能量' },
+            'SLEEP': { name: 'SLEEP', displayName: '休息', emoji: '💤', description: '让宠物休息，恢复能量' },
+            'PET': { name: 'PET', displayName: '抚摸', emoji: '✋', description: '轻柔地抚摸宠物，增加快乐度' },
+            'TALK': { name: 'TALK', displayName: '聊天', emoji: '💬', description: '和宠物说话，增加快乐度' },
+            'MEDICINE': { name: 'MEDICINE', displayName: '治疗', emoji: '💊', description: '给生病的宠物治疗' },
+            'EXERCISE': { name: 'EXERCISE', displayName: '运动', emoji: '🏃', description: '带宠物运动，增加健康度' },
+            'FEED_TREAT': { name: 'FEED_TREAT', displayName: '给零食', emoji: '🍪', description: '给宠物特殊零食，大幅增加快乐度' },
+            'FEED_MEDICINE': { name: 'FEED_MEDICINE', displayName: '喂药', emoji: '💉', description: '给宠物喂药，恢复健康' }
+          }
+          availableActions.value = data.availableActions.map((actionName: string) => 
+            actionMap[actionName] || { name: actionName, displayName: actionName, emoji: '❓', description: '未知动作' }
+          )
+        } else {
+          // 如果已经是对象数组，直接使用
+          availableActions.value = data.availableActions
+        }
+      }
+      
       inventory.value = data.inventory
     }
   } catch (error: any) {
-    if (error.response?.status !== 404) {
+    if (error.response?.status === 404) {
+      // 用户没有宠物，保持在创建界面
+      pet.value = null
+    } else {
       showMessage('加载宠物信息失败', 'error')
     }
   }

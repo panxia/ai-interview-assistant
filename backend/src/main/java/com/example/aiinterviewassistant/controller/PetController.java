@@ -44,13 +44,9 @@ public class PetController {
     public ResponseEntity<ApiResponse<PetInfo>> getPetInfo(@PathVariable String playerId) {
         Pet pet = petService.getPet(playerId);
         
-        // 如果玩家没有宠物，自动创建一个默认宠物
+        // 如果玩家没有宠物，返回404让前端显示创建界面
         if (pet == null) {
-            try {
-                pet = petService.createPet(playerId, "小宠物", PetType.CAT);
-            } catch (Exception e) {
-                return ResponseEntity.badRequest().body(ApiResponse.error("自动创建宠物失败：" + e.getMessage()));
-            }
+            return ResponseEntity.notFound().build();
         }
 
         PetInfo petInfo = new PetInfo(
@@ -177,14 +173,10 @@ public class PetController {
             @PathVariable String playerId,
             @RequestBody StartGameRequest request) {
         
-        // 确保玩家有宠物，如果没有则自动创建
+        // 确保玩家有宠物才能开始游戏
         Pet pet = petService.getPet(playerId);
         if (pet == null) {
-            try {
-                petService.createPet(playerId, "小宠物", PetType.CAT);
-            } catch (Exception e) {
-                return ResponseEntity.badRequest().body(ApiResponse.error("自动创建宠物失败：" + e.getMessage()));
-            }
+            return ResponseEntity.badRequest().body(ApiResponse.error("请先创建宠物"));
         }
         
         MiniGame.GameResult result = petService.startMiniGame(playerId, request.getGameType());
