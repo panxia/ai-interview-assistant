@@ -3,7 +3,7 @@
     <!-- 初始化宠物界面 -->
     <div v-if="!pet" class="text-center">
       <div class="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-lg mb-6">
-        <h2 class="text-3xl font-bold text-gray-800 mb-4">✨ 欢迎来到宠物世界 ✨</h2>
+        <h2 class="text-3xl font-bold text-gray-800 mb-4">🏞️ 欢迎来到宠物公园 🏞️</h2>
         <p class="text-gray-600 mb-6">选择你的专属宠物，开始温馨的养成之旅！</p>
         
         <div class="mb-6">

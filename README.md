@@ -1,8 +1,8 @@
-# 🐾 可爱宠物养成游戏
+# 🏞️ 宠物公园
 
-一个基于Spring Boot和Vue.js的虚拟宠物养成游戏，让您体验温馨的宠物陪伴时光。
+一个基于Spring Boot和Vue.js的虚拟宠物养成游戏，在这个温馨的宠物公园里，体验与可爱宠物们的美好时光。
 
-![游戏截图](https://via.placeholder.com/800x400/FF69B4/FFFFFF?text=🐾+可爱宠物养成游戏+🐾)
+![游戏截图](https://via.placeholder.com/800x400/FF69B4/FFFFFF?text=🏞️+宠物公园+🏞️)
 
 ## ✨ 游戏特色
 
@@ -83,9 +83,11 @@
 
 #### 1. 克隆项目
 ```bash
-git clone https://github.com/your-username/cute-pet-game.git
-cd cute-pet-game
+git clone https://github.com/panpan/pet-park.git
+cd pet-park
 ```
+
+> **作者：panpan** 🧑‍💻 感谢您对宠物公园项目的关注！
 
 #### 2. 启动后端
 ```bash
@@ -132,7 +134,7 @@ npm run dev
 ## 🏗️ 项目结构
 
 ```
-cute-pet-game/
+pet-park/
 ├── backend/                 # Spring Boot后端
 │   ├── src/main/java/      # Java源代码
 │   │   └── com/example/aiinterviewassistant/
@@ -185,7 +187,7 @@ server:
 
 spring:
   application:
-    name: cute-pet-game
+    name: pet-park
 
 app:
   allowedOrigins: ${ALLOWED_ORIGINS:http://localhost:5173}
@@ -244,11 +246,12 @@ java -jar target/*.jar
 ## 📝 更新日志
 
 ### v1.0.0 (2025-01-XX)
-- 🎉 初始版本发布
-- ✨ 支持7种宠物类型
-- 🎮 4种小游戏
+- 🎉 宠物公园正式开园！
+- ✨ 支持7种可爱宠物入园
+- 🎮 4种趣味小游戏
 - 🏆 完整的成就系统
-- 🛍️ 丰富的物品商店
+- 🛍️ 丰富的宠物用品商店
+- 👨‍💻 由panpan精心打造
 
 ## 📄 许可证
 
@@ -256,14 +259,16 @@ java -jar target/*.jar
 
 ## 🙏 致谢
 
-感谢所有为这个项目做出贡献的开发者和玩家们！
+感谢所有为宠物公园项目做出贡献的开发者和玩家们！
+特别感谢每一位愿意体验这个温馨小游戏的用户。
 
 ## 📞 联系方式
 
-- 项目主页: [GitHub Repository](https://github.com/your-username/cute-pet-game)
-- 问题反馈: [Issue Tracker](https://github.com/your-username/cute-pet-game/issues)
-- 邮箱: your-email@example.com
+- 项目主页: [GitHub Repository](https://github.com/panpan/pet-park)
+- 问题反馈: [Issue Tracker](https://github.com/panpan/pet-park/issues)
+- 作者: panpan
+- 邮箱: panpan@example.com
 
 ---
 
-🐾 **开始您的宠物养成之旅，体验无尽的欢乐与陪伴！** 🐾
+🏞️ **欢迎来到宠物公园，开始您的温馨养成之旅！** 🏞️

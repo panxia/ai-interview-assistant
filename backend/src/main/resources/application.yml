@@ -3,7 +3,7 @@ server:
 
 spring:
   application:
-    name: cute-pet-game
+    name: pet-park
 
 app:
   allowedOrigins: ${ALLOWED_ORIGINS:http://localhost:80}

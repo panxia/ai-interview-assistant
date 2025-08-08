@@ -4,10 +4,10 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>com.example</groupId>
-  <artifactId>ai-interview-assistant</artifactId>
+  	<artifactId>pet-park</artifactId>
   <version>0.1.0</version>
-  <name>ai-interview-assistant</name>
-  <description>AI Interview Assistant Backend (Spring Boot)</description>
+  <name>pet-park</name>
+  <description>🏞️ 宠物公园 - 虚拟宠物养成游戏后端服务 (Spring Boot)</description>
   <properties>
     <java.version>17</java.version>
     <spring-boot.version>3.3.2</spring-boot.version>
