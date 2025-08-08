@@ -538,7 +538,26 @@ async function loadShopItems() {
 async function loadGameTypes() {
   try {
     const response = await axios.get(`${apiBase}/pet/minigame/types`)
-    gameTypes.value = response.data.data
+    const data = response.data.data
+    
+    // 处理游戏类型数据，确保包含完整信息
+    if (Array.isArray(data)) {
+      if (data.length > 0 && typeof data[0] === 'string') {
+        // 如果是字符串数组，转换为完整对象
+        const gameTypeMap: {[key: string]: any} = {
+          'MEMORY': { name: 'MEMORY', displayName: '记忆游戏', emoji: '🧠', description: '记住序列并重复', difficulty: 3, maxReward: 15 },
+          'REACTION': { name: 'REACTION', displayName: '反应游戏', emoji: '⚡', description: '快速点击出现的目标', difficulty: 2, maxReward: 10 },
+          'PUZZLE': { name: 'PUZZLE', displayName: '猜谜游戏', emoji: '🧩', description: '回答简单的问题', difficulty: 4, maxReward: 20 },
+          'TAP': { name: 'TAP', displayName: '拍拍游戏', emoji: '👆', description: '连续点击宠物获得分数', difficulty: 1, maxReward: 8 }
+        }
+        gameTypes.value = data.map((gameTypeName: string) => 
+          gameTypeMap[gameTypeName] || { name: gameTypeName, displayName: gameTypeName, emoji: '🎮', description: '未知游戏' }
+        )
+      } else {
+        // 如果已经是对象数组，直接使用
+        gameTypes.value = data
+      }
+    }
   } catch (error) {
     showMessage('加载游戏类型失败', 'error')
   }

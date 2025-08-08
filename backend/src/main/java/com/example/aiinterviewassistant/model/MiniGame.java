@@ -12,6 +12,7 @@ public class MiniGame {
     /**
      * 游戏类型枚举
      */
+    @com.fasterxml.jackson.annotation.JsonFormat(shape = com.fasterxml.jackson.annotation.JsonFormat.Shape.OBJECT)
     public enum GameType {
         MEMORY("记忆游戏", "🧠", "记住序列并重复", 3, 15),
         REACTION("反应游戏", "⚡", "快速点击出现的目标", 2, 10),
@@ -37,6 +38,10 @@ public class MiniGame {
         public String getDescription() { return description; }
         public int getDifficulty() { return difficulty; }
         public int getMaxReward() { return maxReward; }
+        
+        public String getName() {
+            return this.name();
+        }
     }
 
     /**
