@@ -372,7 +372,7 @@ interface PetAction {
 }
 
 // 响应式数据
-const apiBase = (import.meta as any).env.VITE_API_BASE || '/api'
+const apiBase = (import.meta as any).env.VITE_API_BASE || 'http://115.190.125.35/api'
 const playerId = ref('player1') // 简化版，实际项目中应该使用用户认证
 
 const pet = ref<Pet | null>(null)

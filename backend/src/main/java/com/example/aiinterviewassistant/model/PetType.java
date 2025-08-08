@@ -1,9 +1,12 @@
 package com.example.aiinterviewassistant.model;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 /**
  * 宠物类型枚举
  * 定义了可选择的宠物种类，每种都有独特的特性
  */
+@JsonFormat(shape = JsonFormat.Shape.OBJECT)
 public enum PetType {
     CAT("小猫咪", "🐱", "可爱的小猫，喜欢独立但也需要关爱"),
     DOG("小狗狗", "🐶", "忠诚的伙伴，活泼好动，需要更多的关注"),
@@ -33,5 +36,9 @@ public enum PetType {
 
     public String getDescription() {
         return description;
+    }
+    
+    public String getName() {
+        return this.name();
     }
 }

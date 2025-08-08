@@ -249,6 +249,49 @@ public class PetService {
                 .filter(action -> action.canExecute(pet))
                 .toList();
     }
+    
+    /**
+     * 获取宠物可执行动作的详细信息（用于前端显示）
+     */
+    public List<ActionInfo> getAvailableActionInfo(String playerId) {
+        Pet pet = getPet(playerId);
+        if (pet == null) {
+            return Collections.emptyList();
+        }
+
+        return Arrays.stream(PetAction.values())
+                .filter(action -> action.canExecute(pet))
+                .map(action -> new ActionInfo(
+                    action.name(),
+                    action.getDisplayName(),
+                    action.getEmoji(),
+                    action.getDescription()
+                ))
+                .toList();
+    }
+    
+    /**
+     * 动作信息类
+     */
+    public static class ActionInfo {
+        private String name;
+        private String displayName;
+        private String emoji;
+        private String description;
+        
+        public ActionInfo(String name, String displayName, String emoji, String description) {
+            this.name = name;
+            this.displayName = displayName;
+            this.emoji = emoji;
+            this.description = description;
+        }
+        
+        // Getters
+        public String getName() { return name; }
+        public String getDisplayName() { return displayName; }
+        public String getEmoji() { return emoji; }
+        public String getDescription() { return description; }
+    }
 
     /**
      * 随时间更新宠物状态

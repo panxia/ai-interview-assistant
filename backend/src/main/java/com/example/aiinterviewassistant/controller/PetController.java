@@ -56,7 +56,7 @@ public class PetController {
         PetInfo petInfo = new PetInfo(
             pet,
             petService.getCoins(playerId),
-            petService.getAvailableActions(playerId),
+            petService.getAvailableActionInfo(playerId),
             petService.getPlayerItems(playerId)
         );
 
@@ -305,10 +305,10 @@ public class PetController {
     public static class PetInfo {
         private Pet pet;
         private int coins;
-        private List<PetAction> availableActions;
+        private List<PetService.ActionInfo> availableActions;
         private List<GameItem> inventory;
 
-        public PetInfo(Pet pet, int coins, List<PetAction> availableActions, List<GameItem> inventory) {
+        public PetInfo(Pet pet, int coins, List<PetService.ActionInfo> availableActions, List<GameItem> inventory) {
             this.pet = pet;
             this.coins = coins;
             this.availableActions = availableActions;
@@ -317,7 +317,7 @@ public class PetController {
 
         public Pet getPet() { return pet; }
         public int getCoins() { return coins; }
-        public List<PetAction> getAvailableActions() { return availableActions; }
+        public List<PetService.ActionInfo> getAvailableActions() { return availableActions; }
         public List<GameItem> getInventory() { return inventory; }
     }
 
