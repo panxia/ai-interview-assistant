@@ -1,5 +1,5 @@
 # ---- builder ----
-FROM registry.cn-hangzhou.aliyuncs.com/library/maven:3.9.6-openjdk-17-slim AS builder
+FROM ccr.ccs.tencentyun.com/library/maven:3.9.6-openjdk-17-slim AS builder
 WORKDIR /build
 COPY backend/pom.xml ./
 RUN mvn -B -q -e -DskipTests dependency:go-offline || true
@@ -7,7 +7,7 @@ COPY backend/src ./src
 RUN mvn -B -DskipTests clean package
 
 # ---- runtime ----
-FROM registry.cn-hangzhou.aliyuncs.com/library/openjdk:17-jre-alpine
+FROM ccr.ccs.tencentyun.com/library/openjdk:17-jre-alpine
 WORKDIR /app
 COPY --from=builder /build/target/*.jar /app/app.jar
 EXPOSE 8080
