@@ -71,6 +71,11 @@ public class PetController {
             @PathVariable String playerId,
             @RequestBody ActionRequest request) {
         
+        // 验证动作是否为空
+        if (request.getAction() == null) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("动作不能为空"));
+        }
+        
         PetService.ActionResult result = petService.executeAction(playerId, request.getAction());
         
         if (result.isSuccess()) {

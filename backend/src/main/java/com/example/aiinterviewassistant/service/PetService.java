@@ -69,6 +69,11 @@ public class PetService {
         if (pet == null) {
             return new ActionResult(false, "没有找到宠物", null);
         }
+        
+        // 验证动作是否为空
+        if (action == null) {
+            return new ActionResult(false, "动作不能为空", pet);
+        }
 
         if (!action.canExecute(pet)) {
             return new ActionResult(false, "现在无法执行这个动作", pet);
