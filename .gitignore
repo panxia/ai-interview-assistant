@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+
+# Node / Frontend
+node_modules/
+frontend/node_modules/
+frontend/.npm-cache/
+frontend/dist/
+frontend/.vite/
+frontend/.DS_Store
+frontend/.env*
+
+# Java / Backend
+backend/target/
+backend/.idea/
+backend/*.iml
+backend/.DS_Store
+backend/.env*
+
+# Docker
+**/.env
+**/.cache
+
+# Logs
+*.log

@@ -1,0 +1,15 @@
+# ---- builder ----
+FROM maven:3.9.6-eclipse-temurin-17 AS builder
+WORKDIR /build
+COPY backend/pom.xml ./
+RUN mvn -B -q -e -DskipTests dependency:go-offline || true
+COPY backend/src ./src
+RUN mvn -B -DskipTests clean package
+
+# ---- runtime ----
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+COPY --from=builder /build/target/*.jar /app/app.jar
+EXPOSE 8080
+ENV JAVA_OPTS=""
+ENTRYPOINT ["sh", "-lc", "java $JAVA_OPTS -jar /app/app.jar"]
