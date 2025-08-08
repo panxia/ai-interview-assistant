@@ -7,7 +7,7 @@ COPY backend/src ./src
 RUN mvn -B -DskipTests clean package
 
 # ---- runtime ----
-FROM eclipse-temurin:17.0.10_7-jre-alpine
+FROM registry.cn-hangzhou.aliyuncs.com/opensource_java/openjdk:17
 WORKDIR /app
 COPY --from=builder /build/target/*.jar /app/app.jar
 EXPOSE 8080
