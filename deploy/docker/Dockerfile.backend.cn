@@ -7,7 +7,7 @@ COPY backend/src ./src
 RUN mvn -B -DskipTests clean package
 
 # ---- runtime ----
-FROM eclipse-temurin:17-jre
+FROM openjdk:17
 WORKDIR /app
 COPY --from=builder /build/target/*.jar /app/app.jar
 EXPOSE 8080
