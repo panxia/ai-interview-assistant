@@ -27,7 +27,7 @@ setup_env() {
     
     # 设置默认值
     export DOUBAO_API_BASE=${DOUBAO_API_BASE:-"https://ark.cn-beijing.volces.com/api/v3"}
-    export ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-"http://localhost:80"}
+    export ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-"http://localhost:3000"}
     export SYSTEM_PROMPT=${SYSTEM_PROMPT:-"你是一个专业的面试官，擅长结构化提问与基于STAR法的追问，回答请简洁、条理清晰，并在必要时给出改进建议。"}
 }
 
@@ -44,8 +44,10 @@ start_backend() {
     mvn package -DskipTests -q
     
     echo "启动Spring Boot应用..."
+    cd backend
     java -jar target/*.jar &
     BACKEND_PID=$!
+    cd ..
     
     echo "等待后端启动..."
     sleep 15
@@ -65,8 +67,10 @@ start_frontend() {
     fi
     
     echo "启动Vue开发服务器..."
+    cd frontend
     npm run dev &
     FRONTEND_PID=$!
+    cd ..
     
     sleep 5
     cd ..
@@ -82,7 +86,7 @@ show_info() {
     echo -e "${BLUE}后端API:${NC} http://localhost:8080"
     echo ""
     echo -e "${YELLOW}使用说明:${NC}"
-    echo "1. 在浏览器中访问 http://localhost:80"
+    echo "1. 在浏览器中访问 http://localhost:3000"
     echo "2. 开始您的AI面试体验"
     echo "3. 按 Ctrl+C 停止所有服务"
     echo ""
