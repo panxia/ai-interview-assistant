@@ -3,17 +3,9 @@ server:
 
 spring:
   application:
-    name: ai-interview-assistant
+    name: cute-pet-game
 
 app:
   allowedOrigins: ${ALLOWED_ORIGINS:http://localhost:80}
 
-doubao:
-  # Ark OpenAI-Compatible base path (no trailing slash)
-  apiBase: ${DOUBAO_API_BASE:https://ark.cn-beijing.volces.com/api/v3}
-  apiKey: ${DOUBAO_API_KEY:}
-  # 模型或端点 ID（如 ep-xxxxxxxx），在 Ark 控制台创建
-  model: ${DOUBAO_MODEL:ep-xxxxxxxx}
-
-assistant:
-  systemPrompt: ${SYSTEM_PROMPT:你是一个专业的面试官，擅长结构化提问与基于STAR法的追问，回答请简洁、条理清晰，并在必要时给出改进建议。}
+# 豆包API配置已移除，项目现为纯宠物养成游戏
