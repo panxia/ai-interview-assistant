@@ -88,13 +88,23 @@
             </div>
           </div>
 
-          <!-- 金币显示 -->
-          <div class="bg-yellow-100 px-4 py-2 rounded-2xl shadow-inner">
-            <div class="text-center">
-              <div class="text-2xl">💰</div>
-              <div class="font-bold text-yellow-700">{{ coins }}</div>
-              <div class="text-xs text-yellow-600">金币</div>
+          <!-- 金币显示和重新开始按钮 -->
+          <div class="space-y-3">
+            <div class="bg-yellow-100 px-4 py-2 rounded-2xl shadow-inner">
+              <div class="text-center">
+                <div class="text-2xl">💰</div>
+                <div class="font-bold text-yellow-700">{{ coins }}</div>
+                <div class="text-xs text-yellow-600">金币</div>
+              </div>
             </div>
+            
+            <!-- 重新开始按钮 -->
+            <button 
+              @click="resetGame"
+              class="w-full px-3 py-2 bg-gradient-to-r from-gray-400 to-gray-500 text-white text-sm rounded-xl hover:from-gray-500 hover:to-gray-600 transition-all duration-300"
+            >
+              🔄 重新开始
+            </button>
           </div>
         </div>
       </div>
@@ -662,6 +672,29 @@ function animatePet() {
   setTimeout(() => {
     petAnimationClass.value = ''
   }, 300)
+}
+
+async function resetGame() {
+  if (confirm('确定要重新开始吗？这将删除当前宠物！')) {
+    try {
+      // 发送删除宠物的请求（如果API支持）
+      await axios.delete(`${apiBase}/pet/${playerId.value}`).catch(() => {
+        // 忽略删除错误，可能API不支持
+      })
+      
+      // 重置本地状态
+      pet.value = null
+      coins.value = 0
+      availableActions.value = []
+      inventory.value = []
+      activeGameSession.value = null
+      achievements.value = []
+      
+      showMessage('已重置游戏，请重新选择宠物！', 'success')
+    } catch (error) {
+      showMessage('重置失败，请刷新页面', 'error')
+    }
+  }
 }
 
 function showMessage(msg: string, type: 'success' | 'error' = 'success') {

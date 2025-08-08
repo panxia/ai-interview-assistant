@@ -141,6 +141,19 @@ public class PetController {
     public ResponseEntity<ApiResponse<PetType[]>> getPetTypes() {
         return ResponseEntity.ok(ApiResponse.success("获取宠物类型成功", PetType.values()));
     }
+    
+    /**
+     * 删除宠物（重新开始游戏）
+     */
+    @DeleteMapping("/{playerId}")
+    public ResponseEntity<ApiResponse<String>> deletePet(@PathVariable String playerId) {
+        boolean deleted = petService.deletePet(playerId);
+        if (deleted) {
+            return ResponseEntity.ok(ApiResponse.success("宠物已删除，可以重新开始游戏"));
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
 
     /**
      * 获取玩家统计信息

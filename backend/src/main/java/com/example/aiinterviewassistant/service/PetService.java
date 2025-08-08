@@ -60,6 +60,27 @@ public class PetService {
         }
         return pet;
     }
+    
+    /**
+     * 删除玩家的宠物（重新开始游戏）
+     */
+    public boolean deletePet(String playerId) {
+        Pet pet = pets.remove(playerId);
+        if (pet != null) {
+            // 清理玩家的所有数据
+            playerCoins.remove(playerId);
+            playerInventory.remove(playerId);
+            playerAchievements.remove(playerId);
+            playerStats.remove(playerId);
+            
+            // 清理活跃的游戏会话
+            activeSessions.entrySet().removeIf(entry -> 
+                entry.getValue().getPlayerId().equals(playerId));
+            
+            return true;
+        }
+        return false;
+    }
 
     /**
      * 执行宠物动作
