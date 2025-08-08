@@ -219,10 +219,8 @@ types {
     image/x-icon                                     ico;
     application/javascript                           js;
     application/json                                 json;
-    application/woff                                 woff;
+    application/font-woff                            woff;
     application/font-woff2                           woff2;
-    font/woff                                        woff;
-    font/woff2                                       woff2;
     font/ttf                                         ttf;
     font/otf                                         otf;
     application/octet-stream                         bin exe dll;
