@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🐾 可爱宠物养成游戏 启动脚本"
+echo "🏞️ 宠物公园 启动脚本"
 echo "================================="
 
 # 颜色定义
@@ -349,7 +349,7 @@ stop_nginx() {
 # 显示服务信息
 show_info() {
     echo ""
-    echo -e "${GREEN}🎉 宠物养成游戏启动完成！${NC}"
+    echo -e "${GREEN}🎉 宠物公园启动完成！${NC}"
     echo "======================================"
     echo -e "${CYAN}🌐 游戏界面:${NC} http://localhost:80"
     echo -e "${CYAN}🔧 后端API:${NC} http://localhost:8080"
@@ -384,7 +384,7 @@ show_info() {
 # 清理函数
 cleanup() {
     echo ""
-    echo -e "${YELLOW}🛑 正在停止宠物游戏服务...${NC}"
+    echo -e "${YELLOW}🛑 正在停止宠物公园服务...${NC}"
     
     # 停止后端服务
     if [ ! -z "$BACKEND_PID" ]; then
@@ -399,7 +399,7 @@ cleanup() {
     pkill -f "spring-boot:run" 2>/dev/null
     pkill -f "nginx.*$(pwd)" 2>/dev/null
     
-    echo -e "${PURPLE}👋 感谢游玩宠物养成游戏！${NC}"
+    echo -e "${PURPLE}👋 感谢游玩宠物公园！${NC}"
     echo -e "${GREEN}🎉 所有服务已停止${NC}"
     exit 0
 }
@@ -408,7 +408,7 @@ cleanup() {
 show_welcome() {
     echo -e "${PURPLE}"
     cat << 'EOF'
-    🐾 欢迎来到可爱宠物养成游戏！ 🐾
+    🏞️ 欢迎来到宠物公园！ 🏞️
     
        🐱    🐶    🐰    🐹
          \    |    /    /
@@ -428,25 +428,55 @@ EOF
     echo ""
 }
 
+# 清理之前的服务
+cleanup_previous_services() {
+    echo -e "${BLUE}🔧 清理之前的服务...${NC}"
+    
+    # 停止之前的后端服务
+    echo -e "${YELLOW}🛑 停止之前的后端服务...${NC}"
+    pkill -f "spring-boot:run" 2>/dev/null
+    pkill -f "aiinterviewassistant" 2>/dev/null
+    pkill -f "pet-park" 2>/dev/null
+    
+    # 停止之前的nginx服务
+    echo -e "${YELLOW}🛑 停止之前的nginx服务...${NC}"
+    if [ -f "nginx/logs/nginx.pid" ]; then
+        nginx -s quit -c "$(pwd)/nginx/conf/nginx.conf" -p "$(pwd)/nginx/" 2>/dev/null
+        rm -f nginx/logs/nginx.pid 2>/dev/null
+    fi
+    pkill -f "nginx.*$(pwd)" 2>/dev/null
+    
+    # 等待进程完全停止
+    sleep 2
+    
+    echo -e "${GREEN}✅ 之前的服务已清理${NC}"
+}
+
 # 检查端口占用
 check_ports() {
     echo -e "${BLUE}🔍 检查端口占用...${NC}"
     
     # 检查8080端口
     if lsof -Pi :8080 -sTCP:LISTEN -t >/dev/null 2>&1; then
-        echo -e "${YELLOW}⚠️  端口8080已被占用${NC}"
-        echo -e "${CYAN}可能已有后端服务在运行${NC}"
+        echo -e "${YELLOW}⚠️  端口8080已被占用，将尝试清理...${NC}"
+        cleanup_previous_services
     fi
     
     # 检查80端口
     if lsof -Pi :80 -sTCP:LISTEN -t >/dev/null 2>&1; then
-        echo -e "${YELLOW}⚠️  端口80已被占用${NC}"
-        echo -e "${CYAN}可能已有nginx或其他web服务在运行${NC}"
-        read -p "是否继续？这可能导致端口冲突 (y/N): " continue_anyway
-        if [[ ! "$continue_anyway" =~ ^[Yy]$ ]]; then
-            echo -e "${RED}❌ 启动已取消${NC}"
-            exit 1
-        fi
+        echo -e "${YELLOW}⚠️  端口80已被占用，将尝试清理...${NC}"
+        cleanup_previous_services
+    fi
+    
+    # 再次检查端口是否仍被占用
+    if lsof -Pi :8080 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        echo -e "${RED}❌ 端口8080仍被其他进程占用，可能需要手动停止${NC}"
+        echo -e "${CYAN}提示: sudo lsof -i :8080 查看占用进程${NC}"
+    fi
+    
+    if lsof -Pi :80 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        echo -e "${RED}❌ 端口80仍被其他进程占用，可能需要手动停止${NC}"
+        echo -e "${CYAN}提示: sudo lsof -i :80 查看占用进程${NC}"
     fi
 }
 
@@ -457,8 +487,11 @@ main() {
     
     show_welcome
     
-    echo -e "${BLUE}🔧 开始环境检查...${NC}"
+    echo -e "${BLUE}🔧 开始环境检查和清理...${NC}"
     echo ""
+    
+    # 首先清理之前的服务
+    cleanup_previous_services
     
     # 环境检查
     check_java
@@ -502,7 +535,7 @@ main() {
     case $choice in
         1)
             if [ "$NGINX_AVAILABLE" = true ]; then
-                echo -e "${GREEN}🌟 启动完整宠物游戏服务 (生产模式)...${NC}"
+                echo -e "${GREEN}🌟 启动完整宠物公园服务 (生产模式)...${NC}"
                 echo ""
                 build_frontend
                 setup_nginx
@@ -593,8 +626,9 @@ main() {
     
     # 等待用户中断
     echo ""
-    echo -e "${YELLOW}🎮 宠物游戏运行中，按 Ctrl+C 停止所有服务...${NC}"
+    echo -e "${YELLOW}🎮 宠物公园运行中，按 Ctrl+C 停止所有服务...${NC}"
     echo -e "${CYAN}💡 提示: 您可以同时打开多个浏览器标签页游玩${NC}"
+    echo -e "${GREEN}🔄 现在支持重复启动，如果需要重新启动，可以直接再次运行此脚本${NC}"
     wait
 }
 
