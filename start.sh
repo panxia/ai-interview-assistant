@@ -86,7 +86,7 @@ setup_env() {
     
     # 设置默认值
     export DOUBAO_API_BASE=${DOUBAO_API_BASE:-"https://ark.cn-beijing.volces.com/api/v3"}
-    export ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-"http://localhost:5173"}
+    export ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-"http://localhost:80"}
     export SYSTEM_PROMPT=${SYSTEM_PROMPT:-"你是一个专业的面试官，擅长结构化提问与基于STAR法的追问，回答请简洁、条理清晰，并在必要时给出改进建议。"}
     
     echo -e "${GREEN}✅ 环境变量设置完成${NC}"
@@ -148,11 +148,11 @@ show_info() {
     echo ""
     echo -e "${GREEN}🎉 服务启动完成！${NC}"
     echo "=================================="
-    echo -e "${BLUE}前端地址:${NC} http://localhost:5173"
+    echo -e "${BLUE}前端地址:${NC} http://localhost:80"
     echo -e "${BLUE}后端API:${NC} http://localhost:8080"
     echo ""
     echo -e "${YELLOW}使用说明:${NC}"
-    echo "1. 在浏览器中访问 http://localhost:5173"
+    echo "1. 在浏览器中访问 http://localhost:80"
     echo "2. 开始您的AI面试体验"
     echo "3. 按 Ctrl+C 停止所有服务"
     echo ""
@@ -219,7 +219,7 @@ main() {
         3)
             echo -e "${GREEN}仅启动前端...${NC}"
             start_frontend
-            echo -e "${GREEN}✅ 前端服务已启动: http://localhost:5173${NC}"
+            echo -e "${GREEN}✅ 前端服务已启动: http://localhost:80${NC}"
             ;;
         *)
             echo -e "${RED}❌ 无效选择${NC}"

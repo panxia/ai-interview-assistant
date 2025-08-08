@@ -6,7 +6,7 @@ spring:
     name: ai-interview-assistant
 
 app:
-  allowedOrigins: ${ALLOWED_ORIGINS:http://localhost:5173}
+  allowedOrigins: ${ALLOWED_ORIGINS:http://localhost:80}
 
 doubao:
   # Ark OpenAI-Compatible base path (no trailing slash)
