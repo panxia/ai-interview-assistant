@@ -82,6 +82,22 @@ check_npm() {
     echo -e "${GREEN}✅ npm环境正常 - v$(npm --version)${NC}"
 }
 
+# 检查nginx
+check_nginx() {
+    echo -e "${BLUE}🔍 检查nginx环境...${NC}"
+    if ! command -v nginx &> /dev/null; then
+        echo -e "${RED}❌ nginx未安装，请先安装nginx${NC}"
+        echo -e "${YELLOW}💡 安装建议：${NC}"
+        echo "  macOS: brew install nginx"
+        echo "  Ubuntu: sudo apt-get install nginx"
+        echo "  CentOS: sudo yum install nginx"
+        return 1
+    fi
+    
+    echo -e "${GREEN}✅ nginx环境正常 - $(nginx -v 2>&1)${NC}"
+    return 0
+}
+
 # 设置环境变量
 setup_env() {
     echo -e "${PURPLE}🔧 设置环境变量...${NC}"
@@ -140,9 +156,9 @@ start_backend() {
     cd ..
 }
 
-# 启动前端
-start_frontend() {
-    echo -e "${PURPLE}🎨 启动宠物游戏前端服务...${NC}"
+# 构建前端
+build_frontend() {
+    echo -e "${PURPLE}🎨 构建宠物游戏前端...${NC}"
     cd frontend
     
     # 检查node_modules是否存在
@@ -157,23 +173,179 @@ start_frontend() {
         fi
     fi
     
-    # 启动开发服务器
-    echo -e "${BLUE}🌈 启动Vue宠物游戏界面...${NC}"
-    npm run dev > ../frontend.log 2>&1 &
-    FRONTEND_PID=$!
+    # 清理之前的构建
+    echo -e "${BLUE}🧹 清理之前的构建文件...${NC}"
+    rm -rf dist
     
-    # 等待前端启动
-    echo -e "${YELLOW}⏳ 等待前端服务启动...${NC}"
-    sleep 8
+    # 构建前端
+    echo -e "${BLUE}🏗️ 构建Vue宠物游戏界面...${NC}"
+    npm run build
     
-    # 检查前端是否启动成功
-    if curl -s http://localhost:5173 > /dev/null 2>&1; then
-        echo -e "${GREEN}✅ 宠物游戏前端界面启动成功！${NC}"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ 前端构建成功！${NC}"
     else
-        echo -e "${YELLOW}⚠️  前端服务可能还在启动中...${NC}"
+        echo -e "${RED}❌ 前端构建失败${NC}"
+        cd ..
+        exit 1
     fi
     
     cd ..
+}
+
+# 配置nginx
+setup_nginx() {
+    echo -e "${PURPLE}🌐 配置nginx服务...${NC}"
+    
+    # 创建nginx配置目录
+    mkdir -p nginx/conf
+    mkdir -p nginx/html
+    mkdir -p nginx/logs
+    
+    # 复制前端构建文件
+    echo -e "${BLUE}📂 复制前端文件...${NC}"
+    cp -r frontend/dist/* nginx/html/
+    
+    # 创建mime.types文件
+    cat > nginx/conf/mime.types << 'EOF'
+types {
+    text/html                                        html htm shtml;
+    text/css                                         css;
+    text/xml                                         xml;
+    image/gif                                        gif;
+    image/jpeg                                       jpeg jpg;
+    image/png                                        png;
+    image/svg+xml                                    svg svgz;
+    image/webp                                       webp;
+    image/x-icon                                     ico;
+    application/javascript                           js;
+    application/json                                 json;
+    application/woff                                 woff;
+    application/font-woff2                           woff2;
+    font/woff                                        woff;
+    font/woff2                                       woff2;
+    font/ttf                                         ttf;
+    font/otf                                         otf;
+    application/octet-stream                         bin exe dll;
+}
+EOF
+
+    # 创建nginx配置文件
+    cat > nginx/conf/nginx.conf << 'EOF'
+worker_processes 1;
+error_log logs/error.log;
+pid logs/nginx.pid;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+    
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" '
+                    '"$http_user_agent" "$http_x_forwarded_for"';
+    
+    access_log logs/access.log main;
+    sendfile on;
+    keepalive_timeout 65;
+    gzip on;
+    gzip_types text/plain application/javascript text/css application/json image/svg+xml;
+
+    server {
+        listen       80;
+        server_name  localhost;
+        
+        root html;
+        index index.html;
+        
+        # 静态文件缓存
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+        
+        # Vue.js单页应用路由
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+        
+        # API代理到后端
+        location /api/ {
+            proxy_pass http://127.0.0.1:8080;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection 'upgrade';
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_cache_bypass $http_upgrade;
+        }
+        
+        # 健康检查
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+    }
+}
+EOF
+    
+    echo -e "${GREEN}✅ nginx配置文件创建完成${NC}"
+}
+
+# 启动nginx
+start_nginx() {
+    echo -e "${PURPLE}🚀 启动nginx服务...${NC}"
+    
+    # 测试nginx配置
+    echo -e "${BLUE}🔧 测试nginx配置...${NC}"
+    nginx -t -c "$(pwd)/nginx/conf/nginx.conf" -p "$(pwd)/nginx/"
+    
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}❌ nginx配置测试失败${NC}"
+        exit 1
+    fi
+    
+    # 启动nginx
+    echo -e "${BLUE}🌐 启动nginx服务器...${NC}"
+    nginx -c "$(pwd)/nginx/conf/nginx.conf" -p "$(pwd)/nginx/"
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ nginx服务启动成功！${NC}"
+        
+        # 等待nginx启动
+        sleep 3
+        
+        # 检查nginx是否启动成功
+        if curl -s http://localhost:80/health > /dev/null 2>&1; then
+            echo -e "${GREEN}✅ 宠物游戏前端界面可访问！${NC}"
+        else
+            echo -e "${YELLOW}⚠️  前端界面可能还在启动中...${NC}"
+        fi
+    else
+        echo -e "${RED}❌ nginx服务启动失败${NC}"
+        exit 1
+    fi
+}
+
+# 停止nginx
+stop_nginx() {
+    echo -e "${YELLOW}🛑 停止nginx服务...${NC}"
+    
+    # 查找nginx进程并停止
+    if [ -f "nginx/logs/nginx.pid" ]; then
+        nginx -s quit -c "$(pwd)/nginx/conf/nginx.conf" -p "$(pwd)/nginx/" 2>/dev/null
+        rm -f nginx/logs/nginx.pid 2>/dev/null
+    fi
+    
+    # 强制停止nginx进程
+    pkill -f "nginx.*$(pwd)" 2>/dev/null
+    
+    echo -e "${GREEN}✅ nginx服务已停止${NC}"
 }
 
 # 显示服务信息
@@ -181,8 +353,9 @@ show_info() {
     echo ""
     echo -e "${GREEN}🎉 宠物养成游戏启动完成！${NC}"
     echo "======================================"
-    echo -e "${CYAN}🌐 游戏界面:${NC} http://localhost:5173"
+    echo -e "${CYAN}🌐 游戏界面:${NC} http://localhost:80"
     echo -e "${CYAN}🔧 后端API:${NC} http://localhost:8080"
+    echo -e "${CYAN}🔍 健康检查:${NC} http://localhost:80/health"
     echo ""
     echo -e "${PURPLE}🐾 游戏特色:${NC}"
     echo "  🐱 7种可爱宠物: 猫咪、小狗、兔子、仓鼠、小龙、熊猫、企鹅"
@@ -192,7 +365,7 @@ show_info() {
     echo "  🛍️ 物品收集: 食物、玩具、药品、装饰品"
     echo ""
     echo -e "${YELLOW}🎯 使用说明:${NC}"
-    echo "  1. 在浏览器中访问 http://localhost:5173"
+    echo "  1. 在浏览器中访问 http://localhost:80"
     echo "  2. 创建您的专属宠物并开始养成之旅"
     echo "  3. 通过互动动作照顾宠物的各项需求"
     echo "  4. 玩小游戏获得金币和经验值"
@@ -201,7 +374,12 @@ show_info() {
     echo ""
     echo -e "${BLUE}📊 日志查看:${NC}"
     echo "  后端日志: tail -f backend.log"
-    echo "  前端日志: tail -f frontend.log"
+    echo "  nginx访问日志: tail -f nginx/logs/access.log"
+    echo "  nginx错误日志: tail -f nginx/logs/error.log"
+    echo ""
+    echo -e "${PURPLE}🔧 nginx管理:${NC}"
+    echo "  重载配置: nginx -s reload -c $(pwd)/nginx/conf/nginx.conf -p $(pwd)/nginx/"
+    echo "  停止服务: nginx -s quit -c $(pwd)/nginx/conf/nginx.conf -p $(pwd)/nginx/"
     echo ""
 }
 
@@ -210,19 +388,18 @@ cleanup() {
     echo ""
     echo -e "${YELLOW}🛑 正在停止宠物游戏服务...${NC}"
     
+    # 停止后端服务
     if [ ! -z "$BACKEND_PID" ]; then
         kill $BACKEND_PID 2>/dev/null
         echo -e "${GREEN}✅ 后端服务已停止${NC}"
     fi
     
-    if [ ! -z "$FRONTEND_PID" ]; then
-        kill $FRONTEND_PID 2>/dev/null
-        echo -e "${GREEN}✅ 前端服务已停止${NC}"
-    fi
+    # 停止nginx服务
+    stop_nginx
     
     # 清理可能残留的进程
     pkill -f "spring-boot:run" 2>/dev/null
-    pkill -f "vite" 2>/dev/null
+    pkill -f "nginx.*$(pwd)" 2>/dev/null
     
     echo -e "${PURPLE}👋 感谢游玩宠物养成游戏！${NC}"
     echo -e "${GREEN}🎉 所有服务已停止${NC}"
@@ -263,10 +440,15 @@ check_ports() {
         echo -e "${CYAN}可能已有后端服务在运行${NC}"
     fi
     
-    # 检查5173端口
-    if lsof -Pi :5173 -sTCP:LISTEN -t >/dev/null 2>&1; then
-        echo -e "${YELLOW}⚠️  端口5173已被占用${NC}"
-        echo -e "${CYAN}可能已有前端服务在运行${NC}"
+    # 检查80端口
+    if lsof -Pi :80 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        echo -e "${YELLOW}⚠️  端口80已被占用${NC}"
+        echo -e "${CYAN}可能已有nginx或其他web服务在运行${NC}"
+        read -p "是否继续？这可能导致端口冲突 (y/N): " continue_anyway
+        if [[ ! "$continue_anyway" =~ ^[Yy]$ ]]; then
+            echo -e "${RED}❌ 启动已取消${NC}"
+            exit 1
+        fi
     fi
 }
 
@@ -285,65 +467,128 @@ main() {
     check_maven
     check_node
     check_npm
+    
+    # 检查nginx（可选）
+    NGINX_AVAILABLE=false
+    if check_nginx; then
+        NGINX_AVAILABLE=true
+    else
+        echo -e "${YELLOW}⚠️  nginx未安装，将无法使用nginx启动模式${NC}"
+        echo -e "${CYAN}建议安装nginx以获得更好的生产环境体验${NC}"
+    fi
+    
     check_ports
     setup_env
     
     echo ""
     echo -e "${PURPLE}🎮 选择启动模式:${NC}"
-    echo "  1) 🌟 完整启动 (后端 + 前端) - 推荐"
-    echo "  2) 🔧 仅启动后端服务"
-    echo "  3) 🎨 仅启动前端界面"
-    echo "  4) 📊 查看运行状态"
+    if [ "$NGINX_AVAILABLE" = true ]; then
+        echo "  1) 🌟 生产模式 (后端 + nginx前端) - 推荐"
+        echo "  2) 🔧 仅启动后端服务"
+        echo "  3) 🎨 仅构建前端 + nginx"
+        echo "  4) 📊 查看运行状态"
+    else
+        echo "  1) 🔧 仅启动后端服务"
+        echo "  2) 📊 查看运行状态"
+        echo ""
+        echo -e "${YELLOW}💡 提示: 安装nginx后可使用完整的前端部署功能${NC}"
+    fi
     echo ""
     
-    read -p "请选择启动模式 (1-4): " choice
+    if [ "$NGINX_AVAILABLE" = true ]; then
+        read -p "请选择启动模式 (1-4): " choice
+    else
+        read -p "请选择启动模式 (1-2): " choice
+    fi
     
     case $choice in
         1)
-            echo -e "${GREEN}🌟 启动完整宠物游戏服务...${NC}"
-            echo ""
-            start_backend
-            start_frontend
-            show_info
-            
-            # 自动打开浏览器（macOS）
-            if [[ "$OSTYPE" == "darwin"* ]]; then
-                echo -e "${CYAN}🌐 正在为您打开游戏界面...${NC}"
-                sleep 2
-                open http://localhost:5173 2>/dev/null
+            if [ "$NGINX_AVAILABLE" = true ]; then
+                echo -e "${GREEN}🌟 启动完整宠物游戏服务 (生产模式)...${NC}"
+                echo ""
+                build_frontend
+                setup_nginx
+                start_nginx
+                start_backend
+                show_info
+                
+                # 自动打开浏览器（macOS）
+                if [[ "$OSTYPE" == "darwin"* ]]; then
+                    echo -e "${CYAN}🌐 正在为您打开游戏界面...${NC}"
+                    sleep 2
+                    open http://localhost:80 2>/dev/null
+                fi
+            else
+                echo -e "${BLUE}🔧 仅启动后端服务...${NC}"
+                start_backend
+                echo -e "${GREEN}✅ 后端服务已启动: http://localhost:8080${NC}"
+                echo -e "${YELLOW}💡 安装nginx后可启动完整前端服务${NC}"
             fi
             ;;
         2)
-            echo -e "${BLUE}🔧 仅启动后端服务...${NC}"
-            start_backend
-            echo -e "${GREEN}✅ 后端服务已启动: http://localhost:8080${NC}"
+            if [ "$NGINX_AVAILABLE" = true ]; then
+                echo -e "${BLUE}🔧 仅启动后端服务...${NC}"
+                start_backend
+                echo -e "${GREEN}✅ 后端服务已启动: http://localhost:8080${NC}"
+            else
+                echo -e "${CYAN}📊 检查服务状态...${NC}"
+                echo ""
+                if curl -s http://localhost:8080/api/pet/types > /dev/null 2>&1; then
+                    echo -e "${GREEN}✅ 后端服务运行正常${NC}"
+                else
+                    echo -e "${RED}❌ 后端服务未运行${NC}"
+                fi
+                
+                if curl -s http://localhost:80/health > /dev/null 2>&1; then
+                    echo -e "${GREEN}✅ nginx前端服务运行正常${NC}"
+                else
+                    echo -e "${RED}❌ nginx前端服务未运行${NC}"
+                fi
+                
+                echo ""
+                echo -e "${YELLOW}如需启动服务，请重新运行此脚本${NC}"
+                exit 0
+            fi
             ;;
         3)
-            echo -e "${PURPLE}🎨 仅启动前端界面...${NC}"
-            start_frontend
-            echo -e "${GREEN}✅ 前端界面已启动: http://localhost:5173${NC}"
+            if [ "$NGINX_AVAILABLE" = true ]; then
+                echo -e "${PURPLE}🎨 构建前端并启动nginx...${NC}"
+                build_frontend
+                setup_nginx
+                start_nginx
+                echo -e "${GREEN}✅ 前端界面已启动: http://localhost:80${NC}"
+                echo -e "${YELLOW}💡 记得启动后端服务以获得完整功能${NC}"
+            else
+                echo -e "${RED}❌ 无效选择${NC}"
+                exit 1
+            fi
             ;;
         4)
-            echo -e "${CYAN}📊 检查服务状态...${NC}"
-            echo ""
-            if curl -s http://localhost:8080/api/pet/types > /dev/null 2>&1; then
-                echo -e "${GREEN}✅ 后端服务运行正常${NC}"
+            if [ "$NGINX_AVAILABLE" = true ]; then
+                echo -e "${CYAN}📊 检查服务状态...${NC}"
+                echo ""
+                if curl -s http://localhost:8080/api/pet/types > /dev/null 2>&1; then
+                    echo -e "${GREEN}✅ 后端服务运行正常${NC}"
+                else
+                    echo -e "${RED}❌ 后端服务未运行${NC}"
+                fi
+                
+                if curl -s http://localhost:80/health > /dev/null 2>&1; then
+                    echo -e "${GREEN}✅ nginx前端服务运行正常${NC}"
+                else
+                    echo -e "${RED}❌ nginx前端服务未运行${NC}"
+                fi
+                
+                echo ""
+                echo -e "${YELLOW}如需启动服务，请重新运行此脚本${NC}"
+                exit 0
             else
-                echo -e "${RED}❌ 后端服务未运行${NC}"
+                echo -e "${RED}❌ 无效选择${NC}"
+                exit 1
             fi
-            
-            if curl -s http://localhost:5173 > /dev/null 2>&1; then
-                echo -e "${GREEN}✅ 前端服务运行正常${NC}"
-            else
-                echo -e "${RED}❌ 前端服务未运行${NC}"
-            fi
-            
-            echo ""
-            echo -e "${YELLOW}如需启动服务，请重新运行此脚本${NC}"
-            exit 0
             ;;
         *)
-            echo -e "${RED}❌ 无效选择，请输入1-4${NC}"
+            echo -e "${RED}❌ 无效选择${NC}"
             exit 1
             ;;
     esac
