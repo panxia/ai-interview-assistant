@@ -64,19 +64,29 @@ public class PetController {
     }
 
     /**
-     * 执行宠物动作
+     * 执行宠物动作（支持字符串动作名称）
      */
     @PostMapping("/{playerId}/action")
     public ResponseEntity<ApiResponse<Pet>> executeAction(
             @PathVariable String playerId,
-            @RequestBody ActionRequest request) {
+            @RequestBody Map<String, Object> request) {
         
-        // 验证动作是否为空
-        if (request.getAction() == null) {
+        // 获取动作名称
+        Object actionObj = request.get("action");
+        if (actionObj == null) {
             return ResponseEntity.badRequest().body(ApiResponse.error("动作不能为空"));
         }
         
-        PetService.ActionResult result = petService.executeAction(playerId, request.getAction());
+        // 转换为PetAction枚举
+        PetAction action;
+        try {
+            String actionName = actionObj.toString().toUpperCase();
+            action = PetAction.valueOf(actionName);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("无效的动作: " + actionObj));
+        }
+        
+        PetService.ActionResult result = petService.executeAction(playerId, action);
         
         if (result.isSuccess()) {
             return ResponseEntity.ok(ApiResponse.success(result.getMessage(), result.getPet()));
@@ -263,6 +273,12 @@ public class PetController {
 
         public PetAction getAction() { return action; }
         public void setAction(PetAction action) { this.action = action; }
+        
+        // 添加用于调试的方法
+        @Override
+        public String toString() {
+            return "ActionRequest{action=" + action + "}";
+        }
     }
 
     public static class UseItemRequest {
