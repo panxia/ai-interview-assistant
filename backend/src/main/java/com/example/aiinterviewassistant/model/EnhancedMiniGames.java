@@ -1,34 +1,13 @@
 package com.example.aiinterviewassistant.model;
 
 import java.util.*;
+import java.time.LocalDateTime;
 
 /**
  * 增强版小游戏系统
- * 包含智力、反应、节奏等多种类型游戏
+ * 实现多种类型的游戏：智力、反应、节奏
  */
 public class EnhancedMiniGames {
-    
-    /**
-     * 游戏类别枚举
-     */
-    public enum GameCategory {
-        INTELLIGENCE("智力游戏", "brain"),
-        REACTION("反应游戏", "speed"),
-        RHYTHM("节奏游戏", "music"),
-        PUZZLE("益智游戏", "puzzle"),
-        ADVENTURE("冒险游戏", "explore");
-        
-        private final String displayName;
-        private final String icon;
-        
-        GameCategory(String displayName, String icon) {
-            this.displayName = displayName;
-            this.icon = icon;
-        }
-        
-        public String getDisplayName() { return displayName; }
-        public String getIcon() { return icon; }
-    }
     
     /**
      * 智力游戏类
@@ -36,159 +15,198 @@ public class EnhancedMiniGames {
     public static class IntelligenceGames {
         
         /**
-         * 记忆挑战Plus
+         * 记忆挑战Plus游戏
          */
         public static class MemoryChallengeGame {
-            private List<MemoryElement> sequence = new ArrayList<>();
-            private List<MemoryElement> playerInput = new ArrayList<>();
-            private int level = 1;
-            private boolean useMultiSensory = true; // 多感官模式
-            private int comboCount = 0;
+            private List<MemorySequence> sequences = new ArrayList<>();
+            private int currentLevel = 1;
+            private int maxLevel = 10;
+            private long timeLimit = 30000; // 30秒
+            private boolean usesMultiSensory = true; // 多感官记忆
             
-            public static class MemoryElement {
-                public String color;
-                public String sound;
-                public String vibration;
-                public int position;
+            public static class MemorySequence {
+                private List<String> colors;
+                private List<String> sounds;
+                private List<String> haptics; // 震动模式
+                private int difficulty;
                 
-                public MemoryElement(String color, String sound, String vibration, int position) {
-                    this.color = color;
-                    this.sound = sound;
-                    this.vibration = vibration;
-                    this.position = position;
+                public MemorySequence(int difficulty) {
+                    this.difficulty = difficulty;
+                    this.colors = new ArrayList<>();
+                    this.sounds = new ArrayList<>();
+                    this.haptics = new ArrayList<>();
                 }
+                
+                // Getters and Setters
+                public List<String> getColors() { return colors; }
+                public void setColors(List<String> colors) { this.colors = colors; }
+                public List<String> getSounds() { return sounds; }
+                public void setSounds(List<String> sounds) { this.sounds = sounds; }
+                public List<String> getHaptics() { return haptics; }
+                public void setHaptics(List<String> haptics) { this.haptics = haptics; }
+                public int getDifficulty() { return difficulty; }
             }
             
             public void generateSequence() {
-                sequence.clear();
-                int length = 2 + level; // 3→5→7→9序列
-                String[] colors = {"red", "blue", "green", "yellow", "purple"};
-                String[] sounds = {"do", "re", "mi", "fa", "sol"};
-                String[] vibrations = {"short", "long", "double", "triple", "pulse"};
+                int length = Math.min(3 + currentLevel, 9);
+                MemorySequence sequence = new MemorySequence(currentLevel);
+                
+                String[] colorOptions = {"red", "blue", "green", "yellow", "purple", "orange", "pink", "cyan"};
+                String[] soundOptions = {"beep", "ding", "chime", "click", "pop", "whistle", "bell", "buzz"};
+                String[] hapticOptions = {"short", "long", "double", "triple", "pulse", "wave", "tap", "vibrate"};
                 
                 for (int i = 0; i < length; i++) {
-                    sequence.add(new MemoryElement(
-                        colors[(int)(Math.random() * colors.length)],
-                        sounds[(int)(Math.random() * sounds.length)],
-                        vibrations[(int)(Math.random() * vibrations.length)],
-                        i
-                    ));
+                    sequence.colors.add(colorOptions[new Random().nextInt(colorOptions.length)]);
+                    sequence.sounds.add(soundOptions[new Random().nextInt(soundOptions.length)]);
+                    sequence.haptics.add(hapticOptions[new Random().nextInt(hapticOptions.length)]);
+                }
+                
+                sequences.add(sequence);
+            }
+            
+            public GameResult checkAnswer(List<String> playerColors, List<String> playerSounds, List<String> playerHaptics) {
+                if (sequences.isEmpty()) return new GameResult(false, "没有序列可检查");
+                
+                MemorySequence current = sequences.get(sequences.size() - 1);
+                boolean colorCorrect = current.colors.equals(playerColors);
+                boolean soundCorrect = !usesMultiSensory || current.sounds.equals(playerSounds);
+                boolean hapticCorrect = !usesMultiSensory || current.haptics.equals(playerHaptics);
+                
+                if (colorCorrect && soundCorrect && hapticCorrect) {
+                    currentLevel++;
+                    int score = currentLevel * 100;
+                    if (currentLevel > maxLevel) {
+                        return new GameResult(true, "游戏完成！", score, true);
+                    } else {
+                        return new GameResult(true, "进入下一级！", score, false);
+                    }
+                } else {
+                    return new GameResult(false, "记忆错误，游戏结束", 0, true);
                 }
             }
             
-            public boolean checkInput(MemoryElement input) {
-                playerInput.add(input);
-                int index = playerInput.size() - 1;
-                
-                if (index >= sequence.size()) {
-                    return false;
-                }
-                
-                MemoryElement expected = sequence.get(index);
-                boolean correct = expected.color.equals(input.color);
-                
-                if (useMultiSensory) {
-                    correct = correct && expected.sound.equals(input.sound);
-                }
-                
-                if (correct && playerInput.size() == sequence.size()) {
-                    // 完成一轮
-                    comboCount++;
-                    level++;
-                    return true;
-                }
-                
-                return correct;
-            }
-            
-            public int calculateScore() {
-                return level * 100 + comboCount * 50;
-            }
+            // Getters
+            public int getCurrentLevel() { return currentLevel; }
+            public int getMaxLevel() { return maxLevel; }
+            public long getTimeLimit() { return timeLimit; }
+            public List<MemorySequence> getSequences() { return sequences; }
         }
         
         /**
          * 拼图游戏
          */
         public static class PuzzleGame {
-            private int[][] puzzle;
-            private int[][] solution;
+            private PuzzlePiece[][] pieces;
             private int gridSize;
-            private int moves = 0;
-            private long startTime;
+            private String imagePath;
+            private boolean isCompleted = false;
+            private int moveCount = 0;
+            
+            public static class PuzzlePiece {
+                private int id;
+                private int currentX, currentY;
+                private int correctX, correctY;
+                private String imageSegment;
+                private boolean isCorrectPosition;
+                
+                public PuzzlePiece(int id, int correctX, int correctY) {
+                    this.id = id;
+                    this.correctX = correctX;
+                    this.correctY = correctY;
+                    this.currentX = correctX;
+                    this.currentY = correctY;
+                }
+                
+                public boolean isInCorrectPosition() {
+                    return currentX == correctX && currentY == correctY;
+                }
+                
+                // Getters and Setters
+                public int getId() { return id; }
+                public int getCurrentX() { return currentX; }
+                public void setCurrentX(int currentX) { this.currentX = currentX; }
+                public int getCurrentY() { return currentY; }
+                public void setCurrentY(int currentY) { this.currentY = currentY; }
+                public int getCorrectX() { return correctX; }
+                public int getCorrectY() { return correctY; }
+                public String getImageSegment() { return imageSegment; }
+                public void setImageSegment(String imageSegment) { this.imageSegment = imageSegment; }
+            }
             
             public PuzzleGame(int difficulty) {
-                // 难度：9块→16块→25块
-                this.gridSize = switch (difficulty) {
-                    case 1 -> 3;
-                    case 2 -> 4;
-                    case 3 -> 5;
-                    default -> 3;
-                };
+                this.gridSize = Math.min(3 + difficulty, 6);
                 initializePuzzle();
             }
             
             private void initializePuzzle() {
-                puzzle = new int[gridSize][gridSize];
-                solution = new int[gridSize][gridSize];
+                pieces = new PuzzlePiece[gridSize][gridSize];
+                List<Integer> positions = new ArrayList<>();
                 
-                // 初始化解决方案
-                int num = 1;
-                for (int i = 0; i < gridSize; i++) {
-                    for (int j = 0; j < gridSize; j++) {
-                        solution[i][j] = num++;
-                        puzzle[i][j] = num - 1;
-                    }
-                }
-                solution[gridSize-1][gridSize-1] = 0; // 空格
-                puzzle[gridSize-1][gridSize-1] = 0;
-                
-                // 打乱拼图
-                shufflePuzzle();
-                startTime = System.currentTimeMillis();
-            }
-            
-            private void shufflePuzzle() {
-                Random rand = new Random();
-                for (int i = 0; i < 100; i++) {
-                    int dir = rand.nextInt(4);
-                    moveEmptySpace(dir);
-                }
-            }
-            
-            private void moveEmptySpace(int direction) {
-                // 找到空格位置
-                int emptyRow = -1, emptyCol = -1;
-                for (int i = 0; i < gridSize; i++) {
-                    for (int j = 0; j < gridSize; j++) {
-                        if (puzzle[i][j] == 0) {
-                            emptyRow = i;
-                            emptyCol = j;
-                            break;
-                        }
+                // 创建拼图片
+                for (int x = 0; x < gridSize; x++) {
+                    for (int y = 0; y < gridSize; y++) {
+                        positions.add(x * gridSize + y);
                     }
                 }
                 
-                // 根据方向移动
-                int newRow = emptyRow, newCol = emptyCol;
-                switch (direction) {
-                    case 0 -> newRow--; // 上
-                    case 1 -> newRow++; // 下
-                    case 2 -> newCol--; // 左
-                    case 3 -> newCol++; // 右
-                }
+                // 打乱顺序
+                Collections.shuffle(positions);
                 
-                // 检查边界并交换
-                if (newRow >= 0 && newRow < gridSize && newCol >= 0 && newCol < gridSize) {
-                    puzzle[emptyRow][emptyCol] = puzzle[newRow][newCol];
-                    puzzle[newRow][newCol] = 0;
-                    moves++;
+                int index = 0;
+                for (int x = 0; x < gridSize; x++) {
+                    for (int y = 0; y < gridSize; y++) {
+                        int pieceId = positions.get(index++);
+                        int correctX = pieceId / gridSize;
+                        int correctY = pieceId % gridSize;
+                        pieces[x][y] = new PuzzlePiece(pieceId, correctX, correctY);
+                        pieces[x][y].setCurrentX(x);
+                        pieces[x][y].setCurrentY(y);
+                    }
                 }
             }
             
-            public boolean isSolved() {
-                for (int i = 0; i < gridSize; i++) {
-                    for (int j = 0; j < gridSize; j++) {
-                        if (puzzle[i][j] != solution[i][j]) {
+            public GameResult movePiece(int fromX, int fromY, int toX, int toY) {
+                if (!isValidMove(fromX, fromY, toX, toY)) {
+                    return new GameResult(false, "无效移动");
+                }
+                
+                // 交换拼图片
+                PuzzlePiece temp = pieces[fromX][fromY];
+                pieces[fromX][fromY] = pieces[toX][toY];
+                pieces[toX][toY] = temp;
+                
+                // 更新位置
+                if (pieces[fromX][fromY] != null) {
+                    pieces[fromX][fromY].setCurrentX(fromX);
+                    pieces[fromX][fromY].setCurrentY(fromY);
+                }
+                if (pieces[toX][toY] != null) {
+                    pieces[toX][toY].setCurrentX(toX);
+                    pieces[toX][toY].setCurrentY(toY);
+                }
+                
+                moveCount++;
+                
+                // 检查是否完成
+                if (checkCompletion()) {
+                    isCompleted = true;
+                    int score = Math.max(1000 - moveCount * 10, 100);
+                    return new GameResult(true, "拼图完成！", score, true);
+                }
+                
+                return new GameResult(true, "继续拼图", 0, false);
+            }
+            
+            private boolean isValidMove(int fromX, int fromY, int toX, int toY) {
+                return fromX >= 0 && fromX < gridSize && fromY >= 0 && fromY < gridSize &&
+                       toX >= 0 && toX < gridSize && toY >= 0 && toY < gridSize &&
+                       Math.abs(fromX - toX) + Math.abs(fromY - toY) == 1;
+            }
+            
+            private boolean checkCompletion() {
+                for (int x = 0; x < gridSize; x++) {
+                    for (int y = 0; y < gridSize; y++) {
+                        if (pieces[x][y] != null && !pieces[x][y].isInCorrectPosition()) {
                             return false;
                         }
                     }
@@ -196,13 +214,11 @@ public class EnhancedMiniGames {
                 return true;
             }
             
-            public int calculateScore() {
-                long timeSpent = (System.currentTimeMillis() - startTime) / 1000;
-                int baseScore = 1000;
-                int timePenalty = (int)(timeSpent * 2);
-                int movePenalty = moves * 5;
-                return Math.max(100, baseScore - timePenalty - movePenalty);
-            }
+            // Getters
+            public PuzzlePiece[][] getPieces() { return pieces; }
+            public int getGridSize() { return gridSize; }
+            public boolean isCompleted() { return isCompleted; }
+            public int getMoveCount() { return moveCount; }
         }
         
         /**
@@ -211,77 +227,103 @@ public class EnhancedMiniGames {
         public static class SpotDifferenceGame {
             private List<Difference> differences = new ArrayList<>();
             private List<Difference> foundDifferences = new ArrayList<>();
+            private int totalDifferences;
+            private long timeLimit = 60000; // 60秒
+            private boolean useHints = true;
             private int hintsUsed = 0;
-            private long startTime;
             
             public static class Difference {
-                public float x;
-                public float y;
-                public float radius;
-                public String type;
-                public boolean found;
+                private int id;
+                private float x, y; // 相对位置 (0-1)
+                private String type; // "color", "shape", "missing", "extra"
+                private String description;
+                private boolean isFound = false;
                 
-                public Difference(float x, float y, float radius, String type) {
+                public Difference(int id, float x, float y, String type, String description) {
+                    this.id = id;
                     this.x = x;
                     this.y = y;
-                    this.radius = radius;
                     this.type = type;
-                    this.found = false;
+                    this.description = description;
                 }
+                
+                public boolean isInArea(float clickX, float clickY, float tolerance) {
+                    return Math.abs(x - clickX) < tolerance && Math.abs(y - clickY) < tolerance;
+                }
+                
+                // Getters and Setters
+                public int getId() { return id; }
+                public float getX() { return x; }
+                public float getY() { return y; }
+                public String getType() { return type; }
+                public String getDescription() { return description; }
+                public boolean isFound() { return isFound; }
+                public void setFound(boolean found) { isFound = found; }
             }
             
             public void generateDifferences(int count) {
+                this.totalDifferences = count;
                 differences.clear();
-                String[] types = {"color", "shape", "missing", "extra", "size"};
+                
+                Random random = new Random();
+                String[] types = {"color", "shape", "missing", "extra"};
+                String[] descriptions = {
+                    "颜色不同", "形状变化", "物品消失", "多了物品", 
+                    "大小改变", "位置偏移", "图案不同", "阴影变化"
+                };
                 
                 for (int i = 0; i < count; i++) {
-                    differences.add(new Difference(
-                        (float)(Math.random() * 100),
-                        (float)(Math.random() * 100),
-                        10f,
-                        types[(int)(Math.random() * types.length)]
-                    ));
+                    float x = random.nextFloat();
+                    float y = random.nextFloat();
+                    String type = types[random.nextInt(types.length)];
+                    String desc = descriptions[random.nextInt(descriptions.length)];
+                    
+                    differences.add(new Difference(i, x, y, type, desc));
                 }
-                startTime = System.currentTimeMillis();
             }
             
-            public boolean checkClick(float x, float y) {
+            public GameResult clickAt(float x, float y) {
+                float tolerance = 0.1f; // 10%的容错范围
+                
                 for (Difference diff : differences) {
-                    if (!diff.found) {
-                        float distance = (float)Math.sqrt(
-                            Math.pow(x - diff.x, 2) + Math.pow(y - diff.y, 2)
-                        );
-                        if (distance <= diff.radius) {
-                            diff.found = true;
-                            foundDifferences.add(diff);
-                            return true;
+                    if (!diff.isFound() && diff.isInArea(x, y, tolerance)) {
+                        diff.setFound(true);
+                        foundDifferences.add(diff);
+                        
+                        if (foundDifferences.size() == totalDifferences) {
+                            int score = 1000 - hintsUsed * 100;
+                            return new GameResult(true, "找到所有不同！", score, true);
+                        } else {
+                            return new GameResult(true, "找到一个不同：" + diff.getDescription(), 
+                                                10, false);
                         }
                     }
                 }
-                return false;
+                
+                return new GameResult(false, "这里没有不同", 0, false);
             }
             
-            public Difference useHint() {
-                hintsUsed++;
+            public GameResult useHint() {
+                if (hintsUsed >= 3) {
+                    return new GameResult(false, "提示次数已用完");
+                }
+                
                 for (Difference diff : differences) {
-                    if (!diff.found) {
-                        return diff;
+                    if (!diff.isFound()) {
+                        hintsUsed++;
+                        return new GameResult(true, "提示：在 " + diff.getDescription() + " 附近查看");
                     }
                 }
-                return null;
+                
+                return new GameResult(false, "所有不同都已找到");
             }
             
-            public boolean isComplete() {
-                return foundDifferences.size() == differences.size();
-            }
-            
-            public int calculateScore() {
-                long timeSpent = (System.currentTimeMillis() - startTime) / 1000;
-                int baseScore = 500 * differences.size();
-                int timePenalty = (int)(timeSpent);
-                int hintPenalty = hintsUsed * 100;
-                return Math.max(100, baseScore - timePenalty - hintPenalty);
-            }
+            // Getters
+            public List<Difference> getDifferences() { return differences; }
+            public List<Difference> getFoundDifferences() { return foundDifferences; }
+            public int getTotalDifferences() { return totalDifferences; }
+            public long getTimeLimit() { return timeLimit; }
+            public int getHintsUsed() { return hintsUsed; }
         }
     }
     
@@ -296,225 +338,328 @@ public class EnhancedMiniGames {
         public static class SuperReactionGame {
             private List<Target> targets = new ArrayList<>();
             private int score = 0;
-            private int hits = 0;
-            private int misses = 0;
-            private long reactionTimeTotal = 0;
+            private int totalTargets = 20;
+            private int targetsHit = 0;
+            private long startTime;
+            private boolean isActive = false;
             
             public static class Target {
-                public float x;
-                public float y;
-                public TargetType type;
-                public long appearTime;
-                public long lifetime;
-                public boolean hit;
+                private int id;
+                private float x, y;
+                private TargetType type;
+                private long appearTime;
+                private long lifeTime; // 存在时间
+                private boolean isClicked = false;
+                private int scoreValue;
                 
                 public enum TargetType {
-                    NORMAL(10, "normal"),
-                    GOLDEN(50, "golden"),
-                    BOMB(-20, "bomb"),
-                    SPEED(20, "speed"),
-                    MULTI(30, "multi");
+                    NORMAL(10, 2000, "#4CAF50"),
+                    GOLDEN(50, 1500, "#FFD700"),
+                    BOMB(-20, 3000, "#F44336"),
+                    BONUS(25, 1000, "#9C27B0");
                     
-                    private final int points;
-                    private final String code;
+                    public final int scoreValue;
+                    public final long lifeTime;
+                    public final String color;
                     
-                    TargetType(int points, String code) {
-                        this.points = points;
-                        this.code = code;
+                    TargetType(int scoreValue, long lifeTime, String color) {
+                        this.scoreValue = scoreValue;
+                        this.lifeTime = lifeTime;
+                        this.color = color;
                     }
-                    
-                    public int getPoints() { return points; }
-                    public String getCode() { return code; }
                 }
                 
-                public Target(float x, float y, TargetType type) {
-                    this.x = x;
-                    this.y = y;
+                public Target(int id, TargetType type) {
+                    this.id = id;
                     this.type = type;
                     this.appearTime = System.currentTimeMillis();
-                    this.lifetime = switch (type) {
-                        case GOLDEN -> 1000;
-                        case SPEED -> 500;
-                        default -> 2000;
-                    };
-                    this.hit = false;
+                    this.lifeTime = type.lifeTime;
+                    this.scoreValue = type.scoreValue;
+                    
+                    // 随机位置
+                    Random random = new Random();
+                    this.x = 0.1f + random.nextFloat() * 0.8f;
+                    this.y = 0.1f + random.nextFloat() * 0.8f;
                 }
                 
                 public boolean isExpired() {
-                    return System.currentTimeMillis() - appearTime > lifetime;
-                }
-            }
-            
-            public void spawnTarget() {
-                // 随机生成目标
-                Target.TargetType type;
-                double rand = Math.random();
-                if (rand < 0.1) {
-                    type = Target.TargetType.GOLDEN;
-                } else if (rand < 0.2) {
-                    type = Target.TargetType.BOMB;
-                } else if (rand < 0.3) {
-                    type = Target.TargetType.SPEED;
-                } else if (rand < 0.4) {
-                    type = Target.TargetType.MULTI;
-                } else {
-                    type = Target.TargetType.NORMAL;
+                    return System.currentTimeMillis() - appearTime > lifeTime;
                 }
                 
-                targets.add(new Target(
-                    (float)(Math.random() * 100),
-                    (float)(Math.random() * 100),
-                    type
-                ));
+                public boolean isInRange(float clickX, float clickY, float range) {
+                    return Math.abs(x - clickX) < range && Math.abs(y - clickY) < range;
+                }
+                
+                // Getters and Setters
+                public int getId() { return id; }
+                public float getX() { return x; }
+                public float getY() { return y; }
+                public TargetType getType() { return type; }
+                public boolean isClicked() { return isClicked; }
+                public void setClicked(boolean clicked) { isClicked = clicked; }
+                public int getScoreValue() { return scoreValue; }
             }
             
-            public void hitTarget(Target target) {
-                if (!target.hit) {
-                    target.hit = true;
-                    long reactionTime = System.currentTimeMillis() - target.appearTime;
-                    reactionTimeTotal += reactionTime;
-                    
-                    if (target.type == Target.TargetType.BOMB) {
-                        misses++;
-                    } else {
-                        hits++;
-                    }
-                    
-                    score += target.type.getPoints();
-                    
-                    // 连击奖励
-                    if (hits > 0 && hits % 5 == 0) {
-                        score += 50; // 连击奖励
+            public void startGame() {
+                isActive = true;
+                startTime = System.currentTimeMillis();
+                score = 0;
+                targetsHit = 0;
+                targets.clear();
+                generateTarget();
+            }
+            
+            private void generateTarget() {
+                if (targetsHit >= totalTargets) return;
+                
+                Random random = new Random();
+                Target.TargetType[] types = Target.TargetType.values();
+                
+                // 权重分配：普通目标70%，黄金目标15%，炸弹10%，奖励5%
+                float rand = random.nextFloat();
+                Target.TargetType type;
+                if (rand < 0.7f) type = Target.TargetType.NORMAL;
+                else if (rand < 0.85f) type = Target.TargetType.GOLDEN;
+                else if (rand < 0.95f) type = Target.TargetType.BOMB;
+                else type = Target.TargetType.BONUS;
+                
+                Target target = new Target(targetsHit, type);
+                targets.add(target);
+            }
+            
+            public GameResult clickAt(float x, float y) {
+                if (!isActive) return new GameResult(false, "游戏未开始");
+                
+                float range = 0.05f; // 5%的点击范围
+                
+                for (Target target : targets) {
+                    if (!target.isClicked() && !target.isExpired() && target.isInRange(x, y, range)) {
+                        target.setClicked(true);
+                        score += target.getScoreValue();
+                        targetsHit++;
+                        
+                        // 生成下一个目标
+                        if (targetsHit < totalTargets) {
+                            generateTarget();
+                        }
+                        
+                        String message = target.getType() == Target.TargetType.BOMB ? 
+                                       "炸弹！扣分！" : "命中！+" + target.getScoreValue();
+                        
+                        if (targetsHit >= totalTargets) {
+                            isActive = false;
+                            return new GameResult(true, "游戏完成！最终得分：" + score, score, true);
+                        }
+                        
+                        return new GameResult(true, message, score, false);
                     }
                 }
+                
+                return new GameResult(false, "未命中目标", score, false);
             }
             
             public void updateTargets() {
-                targets.removeIf(target -> {
-                    if (!target.hit && target.isExpired()) {
-                        if (target.type != Target.TargetType.BOMB) {
-                            misses++;
-                        }
-                        return true;
-                    }
-                    return target.hit;
-                });
+                // 移除过期目标
+                targets.removeIf(Target::isExpired);
+                
+                // 如果没有活跃目标且游戏仍在进行，生成新目标
+                if (isActive && targets.isEmpty() && targetsHit < totalTargets) {
+                    generateTarget();
+                }
             }
             
-            public float getAccuracy() {
-                int total = hits + misses;
-                return total > 0 ? (float)hits / total : 0;
-            }
-            
-            public float getAverageReactionTime() {
-                return hits > 0 ? (float)reactionTimeTotal / hits : 0;
-            }
+            // Getters
+            public List<Target> getTargets() { return targets; }
+            public int getScore() { return score; }
+            public int getTargetsHit() { return targetsHit; }
+            public int getTotalTargets() { return totalTargets; }
+            public boolean isActive() { return isActive; }
         }
         
         /**
          * 精准射击游戏
          */
         public static class PrecisionShootingGame {
-            private float slingshotPower = 0;
-            private float slingshotAngle = 0;
-            private List<Projectile> projectiles = new ArrayList<>();
-            private List<Target> targets = new ArrayList<>();
-            private float windSpeed = 0;
-            private float gravity = 9.8f;
+            private List<MovingTarget> targets = new ArrayList<>();
+            private int ammo = 10;
+            private int score = 0;
+            private int hits = 0;
+            private boolean gameActive = false;
+            private PhysicsEngine physics = new PhysicsEngine();
             
-            public static class Projectile {
-                public float x, y;
-                public float vx, vy;
-                public boolean active;
+            public static class MovingTarget {
+                private int id;
+                private float x, y;
+                private float velocityX, velocityY;
+                private float size;
+                private int scoreValue;
+                private boolean isHit = false;
+                private TargetType type;
                 
-                public Projectile(float x, float y, float vx, float vy) {
-                    this.x = x;
-                    this.y = y;
-                    this.vx = vx;
-                    this.vy = vy;
-                    this.active = true;
-                }
-                
-                public void update(float deltaTime, float gravity, float wind) {
-                    if (active) {
-                        vx += wind * deltaTime;
-                        vy -= gravity * deltaTime;
-                        x += vx * deltaTime;
-                        y += vy * deltaTime;
-                        
-                        // 检查边界
-                        if (y < 0 || x < 0 || x > 100) {
-                            active = false;
-                        }
-                    }
-                }
-            }
-            
-            public static class Target {
-                public float x, y;
-                public float width, height;
-                public float speed;
-                public int points;
-                public boolean moving;
-                public boolean hit;
-                
-                public Target(float x, float y, boolean moving) {
-                    this.x = x;
-                    this.y = y;
-                    this.width = 10;
-                    this.height = 10;
-                    this.moving = moving;
-                    this.speed = moving ? (float)(Math.random() * 5 + 2) : 0;
-                    this.points = moving ? 20 : 10;
-                    this.hit = false;
-                }
-                
-                public void update(float deltaTime) {
-                    if (moving && !hit) {
-                        x += speed * deltaTime;
-                        if (x > 90 || x < 10) {
-                            speed = -speed;
-                        }
-                    }
-                }
-                
-                public boolean checkHit(float px, float py) {
-                    return px >= x && px <= x + width && 
-                           py >= y && py <= y + height;
-                }
-            }
-            
-            public void shoot(float power, float angle) {
-                float vx = power * (float)Math.cos(Math.toRadians(angle));
-                float vy = power * (float)Math.sin(Math.toRadians(angle));
-                projectiles.add(new Projectile(10, 10, vx, vy));
-            }
-            
-            public void updatePhysics(float deltaTime) {
-                // 更新风向
-                windSpeed = (float)(Math.sin(System.currentTimeMillis() / 1000.0) * 2);
-                
-                // 更新投射物
-                for (Projectile p : projectiles) {
-                    p.update(deltaTime, gravity, windSpeed);
+                public enum TargetType {
+                    SLOW_BIG(50, 0.08f, 1.0f),
+                    FAST_SMALL(100, 0.04f, 2.0f),
+                    BOUNCING(75, 0.06f, 1.5f);
                     
-                    // 检查碰撞
-                    for (Target t : targets) {
-                        if (!t.hit && t.checkHit(p.x, p.y)) {
-                            t.hit = true;
-                            p.active = false;
-                        }
+                    public final int scoreValue;
+                    public final float size;
+                    public final float speedMultiplier;
+                    
+                    TargetType(int scoreValue, float size, float speedMultiplier) {
+                        this.scoreValue = scoreValue;
+                        this.size = size;
+                        this.speedMultiplier = speedMultiplier;
                     }
                 }
                 
-                // 更新目标
-                for (Target t : targets) {
-                    t.update(deltaTime);
+                public MovingTarget(int id, TargetType type) {
+                    this.id = id;
+                    this.type = type;
+                    this.size = type.size;
+                    this.scoreValue = type.scoreValue;
+                    
+                    Random random = new Random();
+                    this.x = random.nextFloat();
+                    this.y = random.nextFloat();
+                    
+                    float speed = 0.01f * type.speedMultiplier;
+                    this.velocityX = (random.nextFloat() - 0.5f) * speed;
+                    this.velocityY = (random.nextFloat() - 0.5f) * speed;
                 }
                 
-                // 清理非活动投射物
-                projectiles.removeIf(p -> !p.active);
+                public void update() {
+                    x += velocityX;
+                    y += velocityY;
+                    
+                    // 边界反弹
+                    if (x <= 0 || x >= 1) velocityX = -velocityX;
+                    if (y <= 0 || y >= 1) velocityY = -velocityY;
+                    
+                    x = Math.max(0, Math.min(1, x));
+                    y = Math.max(0, Math.min(1, y));
+                }
+                
+                public boolean isHitBy(float shotX, float shotY) {
+                    float distance = (float) Math.sqrt(Math.pow(x - shotX, 2) + Math.pow(y - shotY, 2));
+                    return distance <= size;
+                }
+                
+                // Getters and Setters
+                public int getId() { return id; }
+                public float getX() { return x; }
+                public float getY() { return y; }
+                public float getSize() { return size; }
+                public int getScoreValue() { return scoreValue; }
+                public boolean isHit() { return isHit; }
+                public void setHit(boolean hit) { isHit = hit; }
+                public TargetType getType() { return type; }
             }
+            
+            public static class PhysicsEngine {
+                private float gravity = 0.001f;
+                private float windForce = 0.0005f;
+                private float windDirection = 0; // -1 to 1
+                
+                public ProjectileResult calculateTrajectory(float startX, float startY, 
+                                                         float targetX, float targetY, float power) {
+                    // 简化的弹道计算
+                    float distance = (float) Math.sqrt(Math.pow(targetX - startX, 2) + Math.pow(targetY - startY, 2));
+                    float angle = (float) Math.atan2(targetY - startY, targetX - startX);
+                    
+                    // 考虑重力和风力影响
+                    float adjustedX = targetX + windDirection * windForce * distance;
+                    float adjustedY = targetY + gravity * distance * distance;
+                    
+                    return new ProjectileResult(adjustedX, adjustedY, distance * 100, true);
+                }
+                
+                public static class ProjectileResult {
+                    public final float finalX, finalY;
+                    public final float flightTime;
+                    public final boolean hit;
+                    
+                    public ProjectileResult(float finalX, float finalY, float flightTime, boolean hit) {
+                        this.finalX = finalX;
+                        this.finalY = finalY;
+                        this.flightTime = flightTime;
+                        this.hit = hit;
+                    }
+                }
+                
+                // Getters and Setters
+                public float getGravity() { return gravity; }
+                public float getWindForce() { return windForce; }
+                public float getWindDirection() { return windDirection; }
+                public void setWindDirection(float windDirection) { this.windDirection = windDirection; }
+            }
+            
+            public void startGame() {
+                gameActive = true;
+                ammo = 10;
+                score = 0;
+                hits = 0;
+                targets.clear();
+                
+                // 生成移动目标
+                Random random = new Random();
+                MovingTarget.TargetType[] types = MovingTarget.TargetType.values();
+                
+                for (int i = 0; i < 5; i++) {
+                    MovingTarget.TargetType type = types[random.nextInt(types.length)];
+                    targets.add(new MovingTarget(i, type));
+                }
+            }
+            
+            public GameResult shoot(float targetX, float targetY, float power) {
+                if (!gameActive || ammo <= 0) {
+                    return new GameResult(false, "游戏结束或弹药不足");
+                }
+                
+                ammo--;
+                
+                // 计算弹道
+                PhysicsEngine.ProjectileResult result = physics.calculateTrajectory(
+                    0.5f, 1.0f, targetX, targetY, power);
+                
+                // 检查是否命中目标
+                for (MovingTarget target : targets) {
+                    if (!target.isHit() && target.isHitBy(result.finalX, result.finalY)) {
+                        target.setHit(true);
+                        hits++;
+                        score += target.getScoreValue();
+                        
+                        if (hits == targets.size()) {
+                            gameActive = false;
+                            return new GameResult(true, "全部命中！游戏完成！", score, true);
+                        }
+                        
+                        return new GameResult(true, "命中！+" + target.getScoreValue(), score, false);
+                    }
+                }
+                
+                if (ammo <= 0) {
+                    gameActive = false;
+                    return new GameResult(false, "弹药用尽！游戏结束", score, true);
+                }
+                
+                return new GameResult(false, "未命中", score, false);
+            }
+            
+            public void updateTargets() {
+                for (MovingTarget target : targets) {
+                    if (!target.isHit()) {
+                        target.update();
+                    }
+                }
+            }
+            
+            // Getters
+            public List<MovingTarget> getTargets() { return targets; }
+            public int getAmmo() { return ammo; }
+            public int getScore() { return score; }
+            public int getHits() { return hits; }
+            public boolean isGameActive() { return gameActive; }
+            public PhysicsEngine getPhysics() { return physics; }
         }
     }
     
@@ -527,205 +672,296 @@ public class EnhancedMiniGames {
          * 音乐跳舞游戏
          */
         public static class MusicDanceGame {
-            private List<Beat> beatSequence = new ArrayList<>();
-            private int currentBeat = 0;
-            private int perfectHits = 0;
-            private int goodHits = 0;
-            private int missedHits = 0;
+            private List<BeatNote> beatmap = new ArrayList<>();
+            private int score = 0;
             private int combo = 0;
             private int maxCombo = 0;
+            private boolean gameActive = false;
+            private long gameStartTime;
+            private String currentSong;
             
-            public static class Beat {
-                public long timestamp;
-                public BeatType type;
-                public boolean hit;
-                public HitQuality quality;
+            public static class BeatNote {
+                private long timing; // 毫秒时间戳
+                private NoteType type;
+                private float position; // 0-1 的位置
+                private boolean isHit = false;
+                private HitJudgment judgment = HitJudgment.NONE;
                 
-                public enum BeatType {
-                    TAP("点击", 1),
-                    HOLD("长按", 2),
-                    SWIPE_UP("上滑", 2),
-                    SWIPE_DOWN("下滑", 2),
-                    SWIPE_LEFT("左滑", 2),
-                    SWIPE_RIGHT("右滑", 2),
-                    DOUBLE_TAP("双击", 3);
+                public enum NoteType {
+                    TAP(100),
+                    HOLD(200),
+                    SWIPE_LEFT(150),
+                    SWIPE_RIGHT(150),
+                    DOUBLE_TAP(300);
                     
-                    private final String displayName;
-                    private final int difficulty;
+                    public final int baseScore;
                     
-                    BeatType(String displayName, int difficulty) {
-                        this.displayName = displayName;
-                        this.difficulty = difficulty;
+                    NoteType(int baseScore) {
+                        this.baseScore = baseScore;
                     }
-                    
-                    public String getDisplayName() { return displayName; }
-                    public int getDifficulty() { return difficulty; }
                 }
                 
-                public enum HitQuality {
-                    PERFECT(100, "完美"),
-                    GOOD(50, "良好"),
-                    MISS(0, "错过");
+                public enum HitJudgment {
+                    NONE(0, 0),
+                    MISS(0, 0),
+                    BAD(50, 0),
+                    GOOD(75, 1),
+                    GREAT(90, 1),
+                    PERFECT(100, 1);
                     
-                    private final int points;
-                    private final String displayName;
+                    public final int scoreMultiplier; // 百分比
+                    public final int comboValue;
                     
-                    HitQuality(int points, String displayName) {
-                        this.points = points;
-                        this.displayName = displayName;
+                    HitJudgment(int scoreMultiplier, int comboValue) {
+                        this.scoreMultiplier = scoreMultiplier;
+                        this.comboValue = comboValue;
                     }
-                    
-                    public int getPoints() { return points; }
-                    public String getDisplayName() { return displayName; }
                 }
                 
-                public Beat(long timestamp, BeatType type) {
-                    this.timestamp = timestamp;
+                public BeatNote(long timing, NoteType type, float position) {
+                    this.timing = timing;
                     this.type = type;
-                    this.hit = false;
-                    this.quality = HitQuality.MISS;
+                    this.position = position;
                 }
                 
-                public HitQuality checkTiming(long inputTime) {
-                    long diff = Math.abs(inputTime - timestamp);
-                    if (diff <= 50) {
-                        return HitQuality.PERFECT;
-                    } else if (diff <= 150) {
-                        return HitQuality.GOOD;
-                    } else {
-                        return HitQuality.MISS;
-                    }
+                public HitJudgment judgeHit(long currentTime) {
+                    long timeDiff = Math.abs(currentTime - timing);
+                    
+                    if (timeDiff <= 50) return HitJudgment.PERFECT;
+                    else if (timeDiff <= 100) return HitJudgment.GREAT;
+                    else if (timeDiff <= 150) return HitJudgment.GOOD;
+                    else if (timeDiff <= 200) return HitJudgment.BAD;
+                    else return HitJudgment.MISS;
                 }
+                
+                // Getters and Setters
+                public long getTiming() { return timing; }
+                public NoteType getType() { return type; }
+                public float getPosition() { return position; }
+                public boolean isHit() { return isHit; }
+                public void setHit(boolean hit) { isHit = hit; }
+                public HitJudgment getJudgment() { return judgment; }
+                public void setJudgment(HitJudgment judgment) { this.judgment = judgment; }
             }
             
             public void generateBeatmap(String songName, int difficulty) {
-                // 根据歌曲生成节拍图
-                int bpm = 120; // 每分钟节拍数
-                long beatInterval = 60000 / bpm; // 毫秒
+                this.currentSong = songName;
+                beatmap.clear();
                 
-                for (int i = 0; i < 100; i++) {
-                    Beat.BeatType type = switch ((int)(Math.random() * difficulty)) {
-                        case 0 -> Beat.BeatType.TAP;
-                        case 1 -> Beat.BeatType.HOLD;
-                        case 2 -> Beat.BeatType.SWIPE_UP;
-                        case 3 -> Beat.BeatType.SWIPE_DOWN;
-                        default -> Beat.BeatType.TAP;
-                    };
+                Random random = new Random();
+                long songDuration = 30000; // 30秒歌曲
+                int noteCount = 20 + difficulty * 10; // 根据难度增加音符数量
+                
+                BeatNote.NoteType[] types = BeatNote.NoteType.values();
+                
+                for (int i = 0; i < noteCount; i++) {
+                    long timing = (long) (random.nextFloat() * songDuration);
+                    BeatNote.NoteType type = types[random.nextInt(types.length)];
+                    float position = random.nextFloat();
                     
-                    beatSequence.add(new Beat(i * beatInterval, type));
+                    beatmap.add(new BeatNote(timing, type, position));
+                }
+                
+                // 按时间排序
+                beatmap.sort((a, b) -> Long.compare(a.getTiming(), b.getTiming()));
+            }
+            
+            public void startGame() {
+                gameActive = true;
+                gameStartTime = System.currentTimeMillis();
+                score = 0;
+                combo = 0;
+                maxCombo = 0;
+                
+                // 重置所有音符状态
+                for (BeatNote note : beatmap) {
+                    note.setHit(false);
+                    note.setJudgment(BeatNote.HitJudgment.NONE);
                 }
             }
             
-            public void processInput(Beat.BeatType inputType, long inputTime) {
-                if (currentBeat < beatSequence.size()) {
-                    Beat beat = beatSequence.get(currentBeat);
-                    
-                    if (beat.type == inputType) {
-                        beat.quality = beat.checkTiming(inputTime);
-                        beat.hit = true;
-                        
-                        switch (beat.quality) {
-                            case PERFECT -> {
-                                perfectHits++;
-                                combo++;
-                            }
-                            case GOOD -> {
-                                goodHits++;
-                                combo++;
-                            }
-                            case MISS -> {
-                                missedHits++;
-                                combo = 0;
-                            }
+            public GameResult hitNote(float position, long currentTime) {
+                if (!gameActive) return new GameResult(false, "游戏未开始");
+                
+                long gameTime = currentTime - gameStartTime;
+                float positionTolerance = 0.1f;
+                
+                // 查找最近的未命中音符
+                BeatNote closestNote = null;
+                long minTimeDiff = Long.MAX_VALUE;
+                
+                for (BeatNote note : beatmap) {
+                    if (!note.isHit() && Math.abs(note.getPosition() - position) <= positionTolerance) {
+                        long timeDiff = Math.abs(gameTime - note.getTiming());
+                        if (timeDiff < minTimeDiff && timeDiff <= 200) { // 200ms 容错
+                            minTimeDiff = timeDiff;
+                            closestNote = note;
                         }
-                        
-                        maxCombo = Math.max(maxCombo, combo);
-                        currentBeat++;
                     }
                 }
+                
+                if (closestNote != null) {
+                    closestNote.setHit(true);
+                    BeatNote.HitJudgment judgment = closestNote.judgeHit(gameTime);
+                    closestNote.setJudgment(judgment);
+                    
+                    // 计算分数
+                    int noteScore = (closestNote.getType().baseScore * judgment.scoreMultiplier) / 100;
+                    int comboBonus = Math.min(combo / 10, 5); // 连击奖励
+                    int finalScore = noteScore + (noteScore * comboBonus / 10);
+                    
+                    score += finalScore;
+                    
+                    if (judgment.comboValue > 0) {
+                        combo++;
+                        maxCombo = Math.max(maxCombo, combo);
+                    } else {
+                        combo = 0;
+                    }
+                    
+                    // 检查游戏是否结束
+                    boolean allHit = beatmap.stream().allMatch(BeatNote::isHit);
+                    if (allHit) {
+                        gameActive = false;
+                        return new GameResult(true, "歌曲完成！", score, true);
+                    }
+                    
+                    return new GameResult(true, judgment.name() + "! +" + finalScore, score, false);
+                } else {
+                    combo = 0;
+                    return new GameResult(false, "MISS!", score, false);
+                }
             }
             
-            public int calculateScore() {
-                return perfectHits * 100 + goodHits * 50 + maxCombo * 10;
-            }
-            
-            public float getAccuracy() {
-                int total = perfectHits + goodHits + missedHits;
-                return total > 0 ? (float)(perfectHits + goodHits) / total : 0;
-            }
+            // Getters
+            public List<BeatNote> getBeatmap() { return beatmap; }
+            public int getScore() { return score; }
+            public int getCombo() { return combo; }
+            public int getMaxCombo() { return maxCombo; }
+            public boolean isGameActive() { return gameActive; }
+            public String getCurrentSong() { return currentSong; }
         }
         
         /**
          * 打鼓游戏
          */
         public static class DrumGame {
-            private Map<String, DrumPad> drumPads = new HashMap<>();
-            private List<DrumHit> recordedHits = new ArrayList<>();
-            private boolean recording = false;
-            private boolean playback = false;
+            private Map<DrumPad, Boolean> padStates = new HashMap<>();
+            private List<DrumBeat> sequence = new ArrayList<>();
+            private boolean isRecording = false;
+            private boolean isPlaying = false;
+            private int score = 0;
+            private long recordStartTime;
             
-            public static class DrumPad {
-                public String name;
-                public String sound;
-                public float x, y;
-                public float radius;
+            public enum DrumPad {
+                KICK("踢鼓", "#FF5722"),
+                SNARE("军鼓", "#9C27B0"),
+                HI_HAT("踩镲", "#FFC107"),
+                CRASH("吊镲", "#4CAF50"),
+                TOM1("桶鼓1", "#2196F3"),
+                TOM2("桶鼓2", "#FF9800");
                 
-                public DrumPad(String name, String sound, float x, float y) {
-                    this.name = name;
-                    this.sound = sound;
-                    this.x = x;
-                    this.y = y;
-                    this.radius = 15;
+                public final String displayName;
+                public final String color;
+                
+                DrumPad(String displayName, String color) {
+                    this.displayName = displayName;
+                    this.color = color;
                 }
             }
             
-            public static class DrumHit {
-                public String padName;
-                public long timestamp;
-                public float velocity;
+            public static class DrumBeat {
+                private DrumPad pad;
+                private long timing;
+                private float velocity; // 0-1 的力度
                 
-                public DrumHit(String padName, long timestamp, float velocity) {
-                    this.padName = padName;
-                    this.timestamp = timestamp;
+                public DrumBeat(DrumPad pad, long timing, float velocity) {
+                    this.pad = pad;
+                    this.timing = timing;
                     this.velocity = velocity;
                 }
+                
+                // Getters
+                public DrumPad getPad() { return pad; }
+                public long getTiming() { return timing; }
+                public float getVelocity() { return velocity; }
             }
             
-            public DrumGame() {
-                // 初始化鼓垫
-                drumPads.put("kick", new DrumPad("底鼓", "kick.wav", 50, 70));
-                drumPads.put("snare", new DrumPad("军鼓", "snare.wav", 30, 50));
-                drumPads.put("hihat", new DrumPad("踩镲", "hihat.wav", 70, 50));
-                drumPads.put("crash", new DrumPad("吊镲", "crash.wav", 30, 30));
-                drumPads.put("tom1", new DrumPad("嗵鼓1", "tom1.wav", 50, 30));
-                drumPads.put("tom2", new DrumPad("嗵鼓2", "tom2.wav", 70, 30));
-            }
-            
-            public void hitDrum(float x, float y, float velocity) {
-                for (Map.Entry<String, DrumPad> entry : drumPads.entrySet()) {
-                    DrumPad pad = entry.getValue();
-                    float distance = (float)Math.sqrt(
-                        Math.pow(x - pad.x, 2) + Math.pow(y - pad.y, 2)
-                    );
-                    
-                    if (distance <= pad.radius) {
-                        if (recording) {
-                            recordedHits.add(new DrumHit(
-                                entry.getKey(),
-                                System.currentTimeMillis(),
-                                velocity
-                            ));
-                        }
-                        // 播放声音
-                        playSound(pad.sound, velocity);
-                        break;
-                    }
+            public GameResult hitPad(DrumPad pad, float velocity) {
+                long currentTime = System.currentTimeMillis();
+                
+                // 记录模式
+                if (isRecording) {
+                    long relativeTime = currentTime - recordStartTime;
+                    sequence.add(new DrumBeat(pad, relativeTime, velocity));
+                    return new GameResult(true, "记录：" + pad.displayName);
                 }
+                
+                // 自由演奏模式
+                if (!isPlaying) {
+                    return new GameResult(true, "演奏：" + pad.displayName);
+                }
+                
+                // 跟谱模式 - 这里可以添加跟谱逻辑
+                return new GameResult(true, "跟谱：" + pad.displayName);
             }
             
-            private void playSound(String sound, float velocity) {
-                // 播放鼓声，音量根据力度调整
+            public void startRecording() {
+                isRecording = true;
+                recordStartTime = System.currentTimeMillis();
+                sequence.clear();
             }
+            
+            public void stopRecording() {
+                isRecording = false;
+            }
+            
+            public void playSequence() {
+                isPlaying = true;
+                // 这里应该实现序列播放逻辑
+            }
+            
+            public void stopPlaying() {
+                isPlaying = false;
+            }
+            
+            // Getters
+            public Map<DrumPad, Boolean> getPadStates() { return padStates; }
+            public List<DrumBeat> getSequence() { return sequence; }
+            public boolean isRecording() { return isRecording; }
+            public boolean isPlaying() { return isPlaying; }
+            public int getScore() { return score; }
         }
+    }
+    
+    /**
+     * 游戏结果类
+     */
+    public static class GameResult {
+        private boolean success;
+        private String message;
+        private int score;
+        private boolean gameEnded;
+        
+        public GameResult(boolean success, String message) {
+            this(success, message, 0, false);
+        }
+        
+        public GameResult(boolean success, String message, int score) {
+            this(success, message, score, false);
+        }
+        
+        public GameResult(boolean success, String message, int score, boolean gameEnded) {
+            this.success = success;
+            this.message = message;
+            this.score = score;
+            this.gameEnded = gameEnded;
+        }
+        
+        // Getters
+        public boolean isSuccess() { return success; }
+        public String getMessage() { return message; }
+        public int getScore() { return score; }
+        public boolean isGameEnded() { return gameEnded; }
     }
 }
