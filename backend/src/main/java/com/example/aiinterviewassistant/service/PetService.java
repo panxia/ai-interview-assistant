@@ -7,10 +7,13 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 宠物服务类
- * 负责管理宠物的业务逻辑
+ * 负责管理宠物的业务逻辑，整合所有新系统
  */
 @Service
 public class PetService {
@@ -26,18 +29,72 @@ public class PetService {
     private final Map<String, List<Achievement>> playerAchievements = new ConcurrentHashMap<>();
     private final Map<String, Map<String, Integer>> playerStats = new ConcurrentHashMap<>();
     
+    // 新增系统存储
+    private final Map<String, Environment> playerEnvironments = new ConcurrentHashMap<>();
+    private final Map<String, GestureInteraction> playerGestures = new ConcurrentHashMap<>();
+    private final Map<String, Map<String, Object>> enhancedGameSessions = new ConcurrentHashMap<>();
+    
+    // 定时任务执行器
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+    
     public PetService() {
         // 初始化游戏物品
         for (GameItem item : GameItem.getDefaultItems()) {
             gameItems.put(item.getId(), item);
         }
+        
+        // 启动定时任务
+        startScheduledTasks();
+    }
+    
+    /**
+     * 启动定时任务
+     */
+    private void startScheduledTasks() {
+        // 每分钟更新宠物状态
+        scheduler.scheduleAtFixedRate(() -> {
+            for (Pet pet : pets.values()) {
+                // 更新成长阶段
+                pet.updateGrowthStage();
+                
+                // 执行自主行为
+                if (Math.random() < 0.3) { // 30%概率执行自主行为
+                    pet.performAutonomousBehavior();
+                }
+                
+                // 更新动画位置
+                pet.getAnimation().updatePosition(1.0f);
+            }
+        }, 0, 1, TimeUnit.MINUTES);
+        
+        // 每小时更新天气
+        scheduler.scheduleAtFixedRate(() -> {
+            for (Environment env : playerEnvironments.values()) {
+                env.updateWeather();
+                env.updateTimeOfDay();
+            }
+        }, 0, 1, TimeUnit.HOURS);
     }
 
     /**
      * 创建新宠物
      */
     public Pet createPet(String playerId, String petName, PetType petType) {
+        return createPet(playerId, petName, petType, null);
+    }
+    
+    /**
+     * 创建新宠物（增强版）
+     */
+    public Pet createPet(String playerId, String petName, PetType petType, 
+                        Map<String, Object> customization) {
         Pet pet = new Pet(petName, petType);
+        
+        // 应用自定义外观
+        if (customization != null) {
+            applyCustomization(pet, customization);
+        }
+        
         pets.put(playerId, pet);
         
         // 给新玩家一些初始资源
@@ -47,7 +104,229 @@ public class PetService {
         // 初始化成就系统
         initializePlayerAchievements(playerId);
         
+        // 初始化环境系统
+        Environment env = new Environment();
+        playerEnvironments.put(playerId, env);
+        
+        // 初始化手势系统
+        GestureInteraction gesture = new GestureInteraction();
+        playerGestures.put(playerId, gesture);
+        
         return pet;
+    }
+    
+    /**
+     * 应用自定义设置
+     */
+    private void applyCustomization(Pet pet, Map<String, Object> customization) {
+        PetAppearance appearance = pet.getAppearance();
+        PetPersonality personality = pet.getPersonality();
+        
+        // 外观自定义
+        if (customization.containsKey("headShape")) {
+            appearance.setHeadShape(PetAppearance.HeadShape.valueOf(
+                customization.get("headShape").toString()));
+        }
+        if (customization.containsKey("earStyle")) {
+            appearance.setEarStyle(PetAppearance.EarStyle.valueOf(
+                customization.get("earStyle").toString()));
+        }
+        if (customization.containsKey("eyeType")) {
+            appearance.setEyeType(PetAppearance.EyeType.valueOf(
+                customization.get("eyeType").toString()));
+        }
+        if (customization.containsKey("primaryColor")) {
+            appearance.setPrimaryColor(customization.get("primaryColor").toString());
+        }
+        if (customization.containsKey("pattern")) {
+            appearance.setPattern(PetAppearance.Pattern.valueOf(
+                customization.get("pattern").toString()));
+        }
+        
+        // 性格自定义
+        if (customization.containsKey("personalityType")) {
+            personality.setType(PetPersonality.PersonalityType.valueOf(
+                customization.get("personalityType").toString()));
+        }
+        if (customization.containsKey("playfulness")) {
+            personality.setPlayfulness(Integer.parseInt(
+                customization.get("playfulness").toString()));
+        }
+        if (customization.containsKey("affection")) {
+            personality.setAffection(Integer.parseInt(
+                customization.get("affection").toString()));
+        }
+    }
+    
+    /**
+     * 处理手势交互
+     */
+    public GestureInteraction.GestureResponse handleGesture(String playerId, 
+                                                           String gestureType, 
+                                                           Map<String, Float> position) {
+        Pet pet = getPet(playerId);
+        GestureInteraction gesture = playerGestures.get(playerId);
+        
+        if (pet == null || gesture == null) {
+            return null;
+        }
+        
+        GestureInteraction.GestureType type = GestureInteraction.GestureType.valueOf(gestureType);
+        PetAnimation.Position pos = new PetAnimation.Position(
+            position.getOrDefault("x", 50f),
+            position.getOrDefault("y", 50f)
+        );
+        
+        return gesture.handleGesture(type, pos, pet);
+    }
+    
+    /**
+     * 获取环境信息
+     */
+    public Environment getEnvironment(String playerId) {
+        return playerEnvironments.get(playerId);
+    }
+    
+    /**
+     * 更新环境设置
+     */
+    public boolean updateEnvironment(String playerId, String action, Map<String, Object> params) {
+        Environment env = playerEnvironments.get(playerId);
+        if (env == null) {
+            return false;
+        }
+        
+        switch (action) {
+            case "changeRoom" -> {
+                String roomName = params.get("room").toString();
+                env.setCurrentRoom(Environment.Room.valueOf(roomName));
+                return true;
+            }
+            case "setWeather" -> {
+                String weatherName = params.get("weather").toString();
+                env.setWeather(Environment.Weather.valueOf(weatherName));
+                return true;
+            }
+            case "addFurniture" -> {
+                String furnitureId = params.get("id").toString();
+                String furnitureName = params.get("name").toString();
+                String typeStr = params.get("type").toString();
+                float x = Float.parseFloat(params.get("x").toString());
+                float y = Float.parseFloat(params.get("y").toString());
+                
+                Environment.Furniture furniture = new Environment.Furniture(
+                    furnitureId, furnitureName, 
+                    Environment.Furniture.FurnitureType.valueOf(typeStr)
+                );
+                
+                return env.addFurniture(furniture, new PetAnimation.Position(x, y));
+            }
+            default -> {
+                return false;
+            }
+        }
+    }
+    
+    /**
+     * 开始增强版小游戏
+     */
+    public Map<String, Object> startEnhancedGame(String playerId, String gameCategory, String gameType) {
+        Pet pet = getPet(playerId);
+        if (pet == null) {
+            return Map.of("success", false, "message", "没有找到宠物");
+        }
+        
+        // 检查宠物状态
+        if (pet.getStats().getEnergy() < 20) {
+            return Map.of("success", false, "message", "宠物太累了，无法玩游戏");
+        }
+        
+        Map<String, Object> gameSession = new HashMap<>();
+        gameSession.put("playerId", playerId);
+        gameSession.put("category", gameCategory);
+        gameSession.put("type", gameType);
+        gameSession.put("startTime", System.currentTimeMillis());
+        
+        // 根据游戏类型初始化
+        switch (gameCategory) {
+            case "INTELLIGENCE" -> {
+                switch (gameType) {
+                    case "MEMORY" -> {
+                        EnhancedMiniGames.IntelligenceGames.MemoryChallengeGame game = 
+                            new EnhancedMiniGames.IntelligenceGames.MemoryChallengeGame();
+                        game.generateSequence();
+                        gameSession.put("game", game);
+                    }
+                    case "PUZZLE" -> {
+                        EnhancedMiniGames.IntelligenceGames.PuzzleGame game = 
+                            new EnhancedMiniGames.IntelligenceGames.PuzzleGame(1);
+                        gameSession.put("game", game);
+                    }
+                    case "SPOT_DIFFERENCE" -> {
+                        EnhancedMiniGames.IntelligenceGames.SpotDifferenceGame game = 
+                            new EnhancedMiniGames.IntelligenceGames.SpotDifferenceGame();
+                        game.generateDifferences(5);
+                        gameSession.put("game", game);
+                    }
+                }
+            }
+            case "REACTION" -> {
+                switch (gameType) {
+                    case "SUPER_REACTION" -> {
+                        EnhancedMiniGames.ReactionGames.SuperReactionGame game = 
+                            new EnhancedMiniGames.ReactionGames.SuperReactionGame();
+                        gameSession.put("game", game);
+                    }
+                    case "SHOOTING" -> {
+                        EnhancedMiniGames.ReactionGames.PrecisionShootingGame game = 
+                            new EnhancedMiniGames.ReactionGames.PrecisionShootingGame();
+                        gameSession.put("game", game);
+                    }
+                }
+            }
+            case "RHYTHM" -> {
+                switch (gameType) {
+                    case "DANCE" -> {
+                        EnhancedMiniGames.RhythmGames.MusicDanceGame game = 
+                            new EnhancedMiniGames.RhythmGames.MusicDanceGame();
+                        game.generateBeatmap("default", 1);
+                        gameSession.put("game", game);
+                    }
+                    case "DRUM" -> {
+                        EnhancedMiniGames.RhythmGames.DrumGame game = 
+                            new EnhancedMiniGames.RhythmGames.DrumGame();
+                        gameSession.put("game", game);
+                    }
+                }
+            }
+        }
+        
+        String sessionId = UUID.randomUUID().toString();
+        enhancedGameSessions.put(sessionId, gameSession);
+        
+        return Map.of(
+            "success", true,
+            "sessionId", sessionId,
+            "gameSession", gameSession
+        );
+    }
+    
+    /**
+     * 处理增强版游戏输入
+     */
+    public Map<String, Object> processEnhancedGameInput(String sessionId, Map<String, Object> input) {
+        Map<String, Object> gameSession = enhancedGameSessions.get(sessionId);
+        if (gameSession == null) {
+            return Map.of("success", false, "message", "游戏会话不存在");
+        }
+        
+        Object gameObj = gameSession.get("game");
+        String category = gameSession.get("category").toString();
+        
+        // 根据游戏类型处理输入
+        // 这里需要根据具体游戏类型实现输入处理逻辑
+        
+        return Map.of("success", true, "gameSession", gameSession);
     }
 
     /**
