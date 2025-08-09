@@ -348,6 +348,238 @@ public class PetController {
         public int getItemCount() { return itemCount; }
     }
 
+    // ================= 新增API端点 =================
+    
+    /**
+     * 创建宠物（支持自定义）
+     */
+    @PostMapping("/create-custom")
+    public ResponseEntity<ApiResponse<Pet>> createCustomPet(@RequestBody CreateCustomPetRequest request) {
+        try {
+            Pet pet = petService.createPet(
+                request.getPlayerId(), 
+                request.getPetName(), 
+                request.getPetType(),
+                request.getCustomization()
+            );
+            return ResponseEntity.ok(ApiResponse.success("自定义宠物创建成功！", pet));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("创建宠物失败：" + e.getMessage()));
+        }
+    }
+    
+    /**
+     * 处理手势交互
+     */
+    @PostMapping("/{playerId}/gesture")
+    public ResponseEntity<ApiResponse<GestureInteraction.GestureResponse>> handleGesture(
+            @PathVariable String playerId,
+            @RequestBody GestureRequest request) {
+        
+        GestureInteraction.GestureResponse response = petService.handleGesture(
+            playerId,
+            request.getGestureType(),
+            request.getPosition()
+        );
+        
+        if (response != null) {
+            return ResponseEntity.ok(ApiResponse.success("手势处理成功", response));
+        } else {
+            return ResponseEntity.badRequest().body(ApiResponse.error("手势处理失败"));
+        }
+    }
+    
+    /**
+     * 获取环境信息
+     */
+    @GetMapping("/{playerId}/environment")
+    public ResponseEntity<ApiResponse<Environment>> getEnvironment(@PathVariable String playerId) {
+        Environment env = petService.getEnvironment(playerId);
+        if (env != null) {
+            return ResponseEntity.ok(ApiResponse.success("获取环境信息成功", env));
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
+    
+    /**
+     * 更新环境
+     */
+    @PostMapping("/{playerId}/environment/update")
+    public ResponseEntity<ApiResponse<String>> updateEnvironment(
+            @PathVariable String playerId,
+            @RequestBody EnvironmentUpdateRequest request) {
+        
+        boolean success = petService.updateEnvironment(
+            playerId,
+            request.getAction(),
+            request.getParams()
+        );
+        
+        if (success) {
+            return ResponseEntity.ok(ApiResponse.success("环境更新成功"));
+        } else {
+            return ResponseEntity.badRequest().body(ApiResponse.error("环境更新失败"));
+        }
+    }
+    
+    /**
+     * 开始增强版游戏
+     */
+    @PostMapping("/{playerId}/enhanced-game/start")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> startEnhancedGame(
+            @PathVariable String playerId,
+            @RequestBody StartEnhancedGameRequest request) {
+        
+        Map<String, Object> result = petService.startEnhancedGame(
+            playerId,
+            request.getGameCategory(),
+            request.getGameType()
+        );
+        
+        Boolean success = (Boolean) result.get("success");
+        if (Boolean.TRUE.equals(success)) {
+            return ResponseEntity.ok(ApiResponse.success("游戏开始", result));
+        } else {
+            String message = (String) result.get("message");
+            return ResponseEntity.badRequest().body(ApiResponse.error(message));
+        }
+    }
+    
+    /**
+     * 处理增强版游戏输入
+     */
+    @PostMapping("/enhanced-game/{sessionId}/input")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> processEnhancedGameInput(
+            @PathVariable String sessionId,
+            @RequestBody Map<String, Object> input) {
+        
+        Map<String, Object> result = petService.processEnhancedGameInput(sessionId, input);
+        
+        Boolean success = (Boolean) result.get("success");
+        if (Boolean.TRUE.equals(success)) {
+            return ResponseEntity.ok(ApiResponse.success("输入处理成功", result));
+        } else {
+            String message = (String) result.get("message");
+            return ResponseEntity.badRequest().body(ApiResponse.error(message));
+        }
+    }
+    
+    /**
+     * 获取宠物完整信息（包含新系统）
+     */
+    @GetMapping("/{playerId}/full-info")
+    public ResponseEntity<ApiResponse<FullPetInfo>> getFullPetInfo(@PathVariable String playerId) {
+        Pet pet = petService.getPet(playerId);
+        
+        if (pet == null) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        Environment env = petService.getEnvironment(playerId);
+        
+        FullPetInfo fullInfo = new FullPetInfo(
+            pet,
+            petService.getCoins(playerId),
+            petService.getAvailableActionInfo(playerId),
+            petService.getPlayerItems(playerId),
+            env,
+            pet.getAppearance(),
+            pet.getPersonality(),
+            pet.getAnimation(),
+            pet.getGrowthStage()
+        );
+        
+        return ResponseEntity.ok(ApiResponse.success("获取完整宠物信息成功", fullInfo));
+    }
+    
+    // ================= 新增DTO类 =================
+    
+    public static class CreateCustomPetRequest {
+        private String playerId;
+        private String petName;
+        private PetType petType;
+        private Map<String, Object> customization;
+        
+        // Getters and Setters
+        public String getPlayerId() { return playerId; }
+        public void setPlayerId(String playerId) { this.playerId = playerId; }
+        public String getPetName() { return petName; }
+        public void setPetName(String petName) { this.petName = petName; }
+        public PetType getPetType() { return petType; }
+        public void setPetType(PetType petType) { this.petType = petType; }
+        public Map<String, Object> getCustomization() { return customization; }
+        public void setCustomization(Map<String, Object> customization) { this.customization = customization; }
+    }
+    
+    public static class GestureRequest {
+        private String gestureType;
+        private Map<String, Float> position;
+        
+        public String getGestureType() { return gestureType; }
+        public void setGestureType(String gestureType) { this.gestureType = gestureType; }
+        public Map<String, Float> getPosition() { return position; }
+        public void setPosition(Map<String, Float> position) { this.position = position; }
+    }
+    
+    public static class EnvironmentUpdateRequest {
+        private String action;
+        private Map<String, Object> params;
+        
+        public String getAction() { return action; }
+        public void setAction(String action) { this.action = action; }
+        public Map<String, Object> getParams() { return params; }
+        public void setParams(Map<String, Object> params) { this.params = params; }
+    }
+    
+    public static class StartEnhancedGameRequest {
+        private String gameCategory;
+        private String gameType;
+        
+        public String getGameCategory() { return gameCategory; }
+        public void setGameCategory(String gameCategory) { this.gameCategory = gameCategory; }
+        public String getGameType() { return gameType; }
+        public void setGameType(String gameType) { this.gameType = gameType; }
+    }
+    
+    public static class FullPetInfo {
+        private Pet pet;
+        private int coins;
+        private List<PetService.ActionInfo> availableActions;
+        private List<GameItem> inventory;
+        private Environment environment;
+        private PetAppearance appearance;
+        private PetPersonality personality;
+        private PetAnimation animation;
+        private Pet.GrowthStage growthStage;
+        
+        public FullPetInfo(Pet pet, int coins, List<PetService.ActionInfo> availableActions,
+                          List<GameItem> inventory, Environment environment,
+                          PetAppearance appearance, PetPersonality personality,
+                          PetAnimation animation, Pet.GrowthStage growthStage) {
+            this.pet = pet;
+            this.coins = coins;
+            this.availableActions = availableActions;
+            this.inventory = inventory;
+            this.environment = environment;
+            this.appearance = appearance;
+            this.personality = personality;
+            this.animation = animation;
+            this.growthStage = growthStage;
+        }
+        
+        // Getters
+        public Pet getPet() { return pet; }
+        public int getCoins() { return coins; }
+        public List<PetService.ActionInfo> getAvailableActions() { return availableActions; }
+        public List<GameItem> getInventory() { return inventory; }
+        public Environment getEnvironment() { return environment; }
+        public PetAppearance getAppearance() { return appearance; }
+        public PetPersonality getPersonality() { return personality; }
+        public PetAnimation getAnimation() { return animation; }
+        public Pet.GrowthStage getGrowthStage() { return growthStage; }
+    }
+
     /**
      * 统一API响应格式
      */
