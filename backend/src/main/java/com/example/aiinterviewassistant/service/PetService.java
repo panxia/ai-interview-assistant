@@ -2,1025 +2,657 @@ package com.example.aiinterviewassistant.service;
 
 import com.example.aiinterviewassistant.model.*;
 import org.springframework.stereotype.Service;
-
-import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
- * 宠物服务类
- * 负责管理宠物的业务逻辑，整合所有新系统
+ * 宠物服务 - 增强版
+ * 包含完整的宠物管理、成长、交互和游戏功能
  */
 @Service
 public class PetService {
     
-    // 简单的内存存储（实际项目中应该使用数据库）
+    // 使用内存存储，实际项目中应该使用数据库
     private final Map<String, Pet> pets = new ConcurrentHashMap<>();
-    private final Map<String, Integer> playerCoins = new ConcurrentHashMap<>();
-    private final Map<String, List<String>> playerInventory = new ConcurrentHashMap<>();
-    private final Map<String, GameItem> gameItems = new ConcurrentHashMap<>();
-    
-    // 小游戏和成就系统
-    private final Map<String, MiniGame.GameSession> activeSessions = new ConcurrentHashMap<>();
     private final Map<String, List<Achievement>> playerAchievements = new ConcurrentHashMap<>();
-    private final Map<String, Map<String, Integer>> playerStats = new ConcurrentHashMap<>();
+    private final Map<String, List<GameItem>> playerInventory = new ConcurrentHashMap<>();
+    private final Map<String, LocalDateTime> petLastInteraction = new ConcurrentHashMap<>();
+    private final Random random = new Random();
     
-    // 新增系统存储
-    private final Map<String, Environment> playerEnvironments = new ConcurrentHashMap<>();
-    private final Map<String, GestureInteraction> playerGestures = new ConcurrentHashMap<>();
-    private final Map<String, Map<String, Object>> enhancedGameSessions = new ConcurrentHashMap<>();
-    
-    // 定时任务执行器
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
-    
-    public PetService() {
-        // 初始化游戏物品
-        for (GameItem item : GameItem.getDefaultItems()) {
-            gameItems.put(item.getId(), item);
-        }
-        
-        // 启动定时任务
-        startScheduledTasks();
-    }
-    
-    /**
-     * 启动定时任务
-     */
-    private void startScheduledTasks() {
-        // 每分钟更新宠物状态
-        scheduler.scheduleAtFixedRate(() -> {
-            for (Pet pet : pets.values()) {
-                // 更新成长阶段
-                pet.updateGrowthStage();
-                
-                // 执行自主行为
-                if (Math.random() < 0.3) { // 30%概率执行自主行为
-                    pet.performAutonomousBehavior();
-                }
-                
-                // 更新动画位置
-                pet.getAnimation().updatePosition(1.0f);
-            }
-        }, 0, 1, TimeUnit.MINUTES);
-        
-        // 每小时更新天气
-        scheduler.scheduleAtFixedRate(() -> {
-            for (Environment env : playerEnvironments.values()) {
-                env.updateWeather();
-                env.updateTimeOfDay();
-            }
-        }, 0, 1, TimeUnit.HOURS);
-    }
-
     /**
      * 创建新宠物
      */
-    public Pet createPet(String playerId, String petName, PetType petType) {
-        return createPet(playerId, petName, petType, null);
-    }
-    
-    /**
-     * 创建新宠物（增强版）
-     */
-    public Pet createPet(String playerId, String petName, PetType petType, 
-                        Map<String, Object> customization) {
-        Pet pet = new Pet(petName, petType);
+    public Pet createPet(String playerId, String petName, PetType petType, Map<String, Object> customization) {
+        Pet pet = new Pet();
+        pet.setPetId(generatePetId());
+        pet.setPlayerId(playerId);
+        pet.setPetName(petName);
+        pet.setPetType(petType);
+        pet.setCreatedAt(LocalDateTime.now());
+        pet.setLastInteraction(LocalDateTime.now());
         
-        // 应用自定义外观
-        if (customization != null) {
-            applyCustomization(pet, customization);
+        // 初始化基础属性
+        PetStats stats = new PetStats();
+        stats.setLevel(1);
+        stats.setExperience(0);
+        stats.setHealth(100);
+        stats.setHappiness(80);
+        stats.setEnergy(100);
+        stats.setHunger(20);
+        stats.setCleanliness(90);
+        stats.setIntelligence(10);
+        stats.setStrength(10);
+        stats.setAgility(10);
+        stats.setLoyalty(50);
+        pet.setStats(stats);
+        
+        // 设置外观
+        PetAppearance appearance = createAppearanceFromCustomization(customization);
+        pet.setAppearance(appearance);
+        
+        // 设置性格
+        PetPersonality personality = createPersonalityFromType(
+            (String) customization.get("personalityType")
+        );
+        pet.setPersonality(personality);
+        
+        // 初始化成就和物品
+        playerAchievements.putIfAbsent(playerId, new ArrayList<>());
+        playerInventory.putIfAbsent(playerId, new ArrayList<>());
+        
+        // 添加初始物品
+        addInitialItems(playerId);
+        
+        pets.put(pet.getPetId(), pet);
+        petLastInteraction.put(pet.getPetId(), LocalDateTime.now());
+        
+        // 创建首个宠物成就
+        if (pets.values().stream().filter(p -> p.getPlayerId().equals(playerId)).count() == 1) {
+            unlockAchievement(playerId, "FIRST_PET", "第一个伙伴", "创造了你的第一个宠物", 100);
         }
-        
-        pets.put(playerId, pet);
-        
-        // 给新玩家一些初始资源
-        playerCoins.put(playerId, 100);
-        playerInventory.put(playerId, new ArrayList<>(Arrays.asList("apple", "ball")));
-        
-        // 初始化成就系统
-        initializePlayerAchievements(playerId);
-        
-        // 初始化环境系统
-        Environment env = new Environment();
-        playerEnvironments.put(playerId, env);
-        
-        // 初始化手势系统
-        GestureInteraction gesture = new GestureInteraction();
-        playerGestures.put(playerId, gesture);
         
         return pet;
     }
     
     /**
-     * 应用自定义设置
+     * 根据自定义配置创建外观
      */
-    private void applyCustomization(Pet pet, Map<String, Object> customization) {
-        PetAppearance appearance = pet.getAppearance();
+    private PetAppearance createAppearanceFromCustomization(Map<String, Object> customization) {
+        PetAppearance appearance = new PetAppearance();
+        
+        // 基础设置
+        appearance.setHeadShape((String) customization.getOrDefault("headShape", "round"));
+        appearance.setEarStyle((String) customization.getOrDefault("earStyle", "pointed"));
+        appearance.setEyeType((String) customization.getOrDefault("eyeType", "normal"));
+        appearance.setMouthExpression((String) customization.getOrDefault("mouthExpression", "smile"));
+        
+        // 颜色设置
+        appearance.setPrimaryColor((String) customization.getOrDefault("primaryColor", "#FFA500"));
+        appearance.setSecondaryColor((String) customization.getOrDefault("secondaryColor", "#FFFFFF"));
+        appearance.setEyeColorLeft((String) customization.getOrDefault("eyeColorLeft", "#4169E1"));
+        appearance.setEyeColorRight((String) customization.getOrDefault("eyeColorRight", "#4169E1"));
+        appearance.setNoseColor((String) customization.getOrDefault("noseColor", "#FFB6C1"));
+        
+        // 图案和装饰
+        appearance.setPattern((String) customization.getOrDefault("pattern", "none"));
+        appearance.setPatternColor((String) customization.getOrDefault("patternColor", "#000000"));
+        appearance.setHat((String) customization.getOrDefault("hat", "none"));
+        appearance.setCollar((String) customization.getOrDefault("collar", "none"));
+        appearance.setGlasses((String) customization.getOrDefault("glasses", "none"));
+        
+        // 特殊效果
+        appearance.setHasGlow((Boolean) customization.getOrDefault("hasGlow", false));
+        appearance.setGlowColor((String) customization.getOrDefault("glowColor", "#FFFF00"));
+        appearance.setHasSparkles((Boolean) customization.getOrDefault("hasSparkles", false));
+        
+        // 身体比例
+        @SuppressWarnings("unchecked")
+        Map<String, Double> bodyProportion = (Map<String, Double>) customization.get("bodyProportion");
+        if (bodyProportion != null) {
+            appearance.setBodyProportionFatness(bodyProportion.getOrDefault("fatness", 1.0));
+            appearance.setBodyProportionHeight(bodyProportion.getOrDefault("height", 1.0));
+            appearance.setBodyProportionHeadSize(bodyProportion.getOrDefault("headSize", 1.0));
+            appearance.setBodyProportionLimbLength(bodyProportion.getOrDefault("limbLength", 1.0));
+            appearance.setBodyProportionTailLength(bodyProportion.getOrDefault("tailLength", 1.0));
+        }
+        
+        return appearance;
+    }
+    
+    /**
+     * 根据性格类型创建性格
+     */
+    private PetPersonality createPersonalityFromType(String personalityType) {
+        PetPersonality personality = new PetPersonality();
+        personality.setPersonalityType(personalityType != null ? personalityType : "PLAYFUL");
+        
+        switch (personality.getPersonalityType()) {
+            case "PLAYFUL":
+                personality.setPlayfulness(90);
+                personality.setLaziness(20);
+                personality.setCuriosity(80);
+                personality.setAffection(70);
+                personality.setIndependence(30);
+                personality.setIntelligence(60);
+                break;
+            case "LAZY":
+                personality.setPlayfulness(20);
+                personality.setLaziness(90);
+                personality.setCuriosity(40);
+                personality.setAffection(60);
+                personality.setIndependence(70);
+                personality.setIntelligence(50);
+                break;
+            case "CURIOUS":
+                personality.setPlayfulness(70);
+                personality.setLaziness(30);
+                personality.setCuriosity(95);
+                personality.setAffection(60);
+                personality.setIndependence(60);
+                personality.setIntelligence(85);
+                break;
+            case "AFFECTIONATE":
+                personality.setPlayfulness(60);
+                personality.setLaziness(40);
+                personality.setCuriosity(50);
+                personality.setAffection(95);
+                personality.setIndependence(20);
+                personality.setIntelligence(65);
+                break;
+            case "INDEPENDENT":
+                personality.setPlayfulness(50);
+                personality.setLaziness(60);
+                personality.setCuriosity(70);
+                personality.setAffection(30);
+                personality.setIndependence(90);
+                personality.setIntelligence(75);
+                break;
+            case "INTELLIGENT":
+                personality.setPlayfulness(60);
+                personality.setLaziness(40);
+                personality.setCuriosity(85);
+                personality.setAffection(60);
+                personality.setIndependence(70);
+                personality.setIntelligence(95);
+                break;
+            default:
+                personality.setPlayfulness(50);
+                personality.setLaziness(50);
+                personality.setCuriosity(50);
+                personality.setAffection(50);
+                personality.setIndependence(50);
+                personality.setIntelligence(50);
+        }
+        
+        return personality;
+    }
+    
+    /**
+     * 添加初始物品
+     */
+    private void addInitialItems(String playerId) {
+        List<GameItem> inventory = playerInventory.get(playerId);
+        
+        // 基础食物
+        inventory.add(createItem("BASIC_FOOD", "基础食物", "普通的宠物食物", 5));
+        inventory.add(createItem("WATER", "清水", "新鲜的饮用水", 3));
+        inventory.add(createItem("TOY_BALL", "小球", "简单的玩具球", 1));
+        inventory.add(createItem("BRUSH", "梳子", "保持宠物整洁", 1));
+    }
+    
+    /**
+     * 创建物品
+     */
+    private GameItem createItem(String itemId, String name, String description, int quantity) {
+        GameItem item = new GameItem();
+        item.setItemId(itemId);
+        item.setItemName(name);
+        item.setDescription(description);
+        item.setQuantity(quantity);
+        item.setItemType("CONSUMABLE");
+        item.setRarity("COMMON");
+        return item;
+    }
+    
+    /**
+     * 喂食宠物
+     */
+    public Pet feedPet(String petId, String itemId) {
+        Pet pet = pets.get(petId);
+        if (pet == null) {
+            throw new RuntimeException("宠物不存在");
+        }
+        
+        // 检查玩家是否有该物品
+        List<GameItem> inventory = playerInventory.get(pet.getPlayerId());
+        GameItem foodItem = inventory.stream()
+            .filter(item -> item.getItemId().equals(itemId) && item.getQuantity() > 0)
+            .findFirst()
+            .orElseThrow(() -> new RuntimeException("没有该食物"));
+        
+        // 使用物品
+        foodItem.setQuantity(foodItem.getQuantity() - 1);
+        if (foodItem.getQuantity() <= 0) {
+            inventory.remove(foodItem);
+        }
+        
+        // 喂食效果
+        PetStats stats = pet.getStats();
+        switch (itemId) {
+            case "BASIC_FOOD":
+                stats.setHunger(Math.max(0, stats.getHunger() - 20));
+                stats.setHappiness(Math.min(100, stats.getHappiness() + 5));
+                break;
+            case "PREMIUM_FOOD":
+                stats.setHunger(Math.max(0, stats.getHunger() - 40));
+                stats.setHappiness(Math.min(100, stats.getHappiness() + 15));
+                stats.setHealth(Math.min(100, stats.getHealth() + 5));
+                break;
+            case "WATER":
+                stats.setHunger(Math.max(0, stats.getHunger() - 5));
+                stats.setEnergy(Math.min(100, stats.getEnergy() + 10));
+                break;
+        }
+        
+        // 增加经验
+        addExperience(pet, 5);
+        
+        // 记录交互时间
+        pet.setLastInteraction(LocalDateTime.now());
+        petLastInteraction.put(petId, LocalDateTime.now());
+        
+        return pet;
+    }
+    
+    /**
+     * 与宠物玩耍
+     */
+    public Pet playWithPet(String petId, String activityType) {
+        Pet pet = pets.get(petId);
+        if (pet == null) {
+            throw new RuntimeException("宠物不存在");
+        }
+        
+        PetStats stats = pet.getStats();
         PetPersonality personality = pet.getPersonality();
         
-        // 外观自定义
-        if (customization.containsKey("headShape")) {
-            appearance.setHeadShape(PetAppearance.HeadShape.valueOf(
-                customization.get("headShape").toString()));
-        }
-        if (customization.containsKey("earStyle")) {
-            appearance.setEarStyle(PetAppearance.EarStyle.valueOf(
-                customization.get("earStyle").toString()));
-        }
-        if (customization.containsKey("eyeType")) {
-            appearance.setEyeType(PetAppearance.EyeType.valueOf(
-                customization.get("eyeType").toString()));
-        }
-        if (customization.containsKey("primaryColor")) {
-            appearance.setPrimaryColor(customization.get("primaryColor").toString());
-        }
-        if (customization.containsKey("pattern")) {
-            appearance.setPattern(PetAppearance.Pattern.valueOf(
-                customization.get("pattern").toString()));
+        // 检查能量
+        if (stats.getEnergy() < 20) {
+            throw new RuntimeException("宠物太累了，需要休息");
         }
         
-        // 性格自定义
-        if (customization.containsKey("personalityType")) {
-            personality.setType(PetPersonality.PersonalityType.valueOf(
-                customization.get("personalityType").toString()));
+        // 玩耍效果
+        int happinessGain = 0;
+        int energyCost = 0;
+        int experienceGain = 0;
+        
+        switch (activityType) {
+            case "FETCH":
+                happinessGain = 15 + (personality.getPlayfulness() / 10);
+                energyCost = 25;
+                experienceGain = 8;
+                stats.setAgility(Math.min(100, stats.getAgility() + 1));
+                break;
+            case "PUZZLE":
+                happinessGain = 10 + (personality.getIntelligence() / 10);
+                energyCost = 15;
+                experienceGain = 12;
+                stats.setIntelligence(Math.min(100, stats.getIntelligence() + 2));
+                break;
+            case "CUDDLE":
+                happinessGain = 20 + (personality.getAffection() / 10);
+                energyCost = 5;
+                experienceGain = 5;
+                stats.setLoyalty(Math.min(100, stats.getLoyalty() + 2));
+                break;
+            case "EXERCISE":
+                happinessGain = 12 + (personality.getPlayfulness() / 15);
+                energyCost = 30;
+                experienceGain = 10;
+                stats.setStrength(Math.min(100, stats.getStrength() + 1));
+                stats.setAgility(Math.min(100, stats.getAgility() + 1));
+                break;
         }
-        if (customization.containsKey("playfulness")) {
-            personality.setPlayfulness(Integer.parseInt(
-                customization.get("playfulness").toString()));
+        
+        // 应用效果
+        stats.setHappiness(Math.min(100, stats.getHappiness() + happinessGain));
+        stats.setEnergy(Math.max(0, stats.getEnergy() - energyCost));
+        stats.setHunger(Math.min(100, stats.getHunger() + energyCost / 5));
+        
+        // 增加经验
+        addExperience(pet, experienceGain);
+        
+        // 记录交互时间
+        pet.setLastInteraction(LocalDateTime.now());
+        petLastInteraction.put(petId, LocalDateTime.now());
+        
+        // 检查成就
+        checkPlayAchievements(pet.getPlayerId(), activityType);
+        
+        return pet;
+    }
+    
+    /**
+     * 清洁宠物
+     */
+    public Pet cleanPet(String petId) {
+        Pet pet = pets.get(petId);
+        if (pet == null) {
+            throw new RuntimeException("宠物不存在");
         }
-        if (customization.containsKey("affection")) {
-            personality.setAffection(Integer.parseInt(
-                customization.get("affection").toString()));
+        
+        // 检查是否有梳子
+        List<GameItem> inventory = playerInventory.get(pet.getPlayerId());
+        boolean hasBrush = inventory.stream()
+            .anyMatch(item -> item.getItemId().equals("BRUSH") && item.getQuantity() > 0);
+        
+        if (!hasBrush) {
+            throw new RuntimeException("需要梳子来清洁宠物");
+        }
+        
+        PetStats stats = pet.getStats();
+        stats.setCleanliness(100);
+        stats.setHappiness(Math.min(100, stats.getHappiness() + 10));
+        
+        // 增加经验
+        addExperience(pet, 3);
+        
+        // 记录交互时间
+        pet.setLastInteraction(LocalDateTime.now());
+        petLastInteraction.put(petId, LocalDateTime.now());
+        
+        return pet;
+    }
+    
+    /**
+     * 宠物休息
+     */
+    public Pet restPet(String petId) {
+        Pet pet = pets.get(petId);
+        if (pet == null) {
+            throw new RuntimeException("宠物不存在");
+        }
+        
+        PetStats stats = pet.getStats();
+        stats.setEnergy(Math.min(100, stats.getEnergy() + 50));
+        stats.setHealth(Math.min(100, stats.getHealth() + 5));
+        
+        // 记录交互时间
+        pet.setLastInteraction(LocalDateTime.now());
+        petLastInteraction.put(petId, LocalDateTime.now());
+        
+        return pet;
+    }
+    
+    /**
+     * 添加经验值并处理升级
+     */
+    private void addExperience(Pet pet, int experience) {
+        PetStats stats = pet.getStats();
+        stats.setExperience(stats.getExperience() + experience);
+        
+        // 计算需要的经验值 (level * 100)
+        int requiredExp = stats.getLevel() * 100;
+        
+        while (stats.getExperience() >= requiredExp) {
+            stats.setExperience(stats.getExperience() - requiredExp);
+            stats.setLevel(stats.getLevel() + 1);
+            
+            // 升级奖励
+            stats.setHealth(Math.min(100, stats.getHealth() + 10));
+            stats.setIntelligence(Math.min(100, stats.getIntelligence() + 2));
+            stats.setStrength(Math.min(100, stats.getStrength() + 2));
+            stats.setAgility(Math.min(100, stats.getAgility() + 2));
+            
+            // 升级成就
+            checkLevelAchievements(pet.getPlayerId(), stats.getLevel());
+            
+            requiredExp = stats.getLevel() * 100;
         }
     }
     
     /**
-     * 处理手势交互
+     * 更新宠物状态（被动变化）
      */
-    public GestureInteraction.GestureResponse handleGesture(String playerId, 
-                                                           String gestureType, 
-                                                           Map<String, Float> position) {
-        Pet pet = getPet(playerId);
-        GestureInteraction gesture = playerGestures.get(playerId);
-        
-        if (pet == null || gesture == null) {
+    public Pet updatePetStatus(String petId) {
+        Pet pet = pets.get(petId);
+        if (pet == null) {
             return null;
         }
         
-        GestureInteraction.GestureType type = GestureInteraction.GestureType.valueOf(gestureType);
-        PetAnimation.Position pos = new PetAnimation.Position(
-            position.getOrDefault("x", 50f),
-            position.getOrDefault("y", 50f)
-        );
-        
-        return gesture.handleGesture(type, pos, pet);
-    }
-    
-    /**
-     * 获取环境信息
-     */
-    public Environment getEnvironment(String playerId) {
-        return playerEnvironments.get(playerId);
-    }
-    
-    /**
-     * 更新环境设置
-     */
-    public boolean updateEnvironment(String playerId, String action, Map<String, Object> params) {
-        Environment env = playerEnvironments.get(playerId);
-        if (env == null) {
-            return false;
+        LocalDateTime lastInteraction = petLastInteraction.get(petId);
+        if (lastInteraction == null) {
+            lastInteraction = pet.getLastInteraction();
         }
         
-        switch (action) {
-            case "changeRoom" -> {
-                String roomName = params.get("room").toString();
-                env.setCurrentRoom(Environment.Room.valueOf(roomName));
-                return true;
-            }
-            case "setWeather" -> {
-                String weatherName = params.get("weather").toString();
-                env.setWeather(Environment.Weather.valueOf(weatherName));
-                return true;
-            }
-            case "addFurniture" -> {
-                String furnitureId = params.get("id").toString();
-                String furnitureName = params.get("name").toString();
-                String typeStr = params.get("type").toString();
-                float x = Float.parseFloat(params.get("x").toString());
-                float y = Float.parseFloat(params.get("y").toString());
-                
-                Environment.Furniture furniture = new Environment.Furniture(
-                    furnitureId, furnitureName, 
-                    Environment.Furniture.FurnitureType.valueOf(typeStr)
-                );
-                
-                return env.addFurniture(furniture, new PetAnimation.Position(x, y));
-            }
-            default -> {
-                return false;
-            }
-        }
-    }
-    
-    /**
-     * 开始增强版小游戏
-     */
-    public Map<String, Object> startEnhancedGame(String playerId, String gameCategory, String gameType) {
-        Pet pet = getPet(playerId);
-        if (pet == null) {
-            return Map.of("success", false, "message", "没有找到宠物");
-        }
+        long minutesPassed = ChronoUnit.MINUTES.between(lastInteraction, LocalDateTime.now());
         
-        // 检查宠物状态
-        if (pet.getStats().getEnergy() < 20) {
-            return Map.of("success", false, "message", "宠物太累了，无法玩游戏");
-        }
-        
-        Map<String, Object> gameSession = new HashMap<>();
-        gameSession.put("playerId", playerId);
-        gameSession.put("category", gameCategory);
-        gameSession.put("type", gameType);
-        gameSession.put("startTime", System.currentTimeMillis());
-        
-        // 根据游戏类型初始化
-        switch (gameCategory) {
-            case "INTELLIGENCE" -> {
-                switch (gameType) {
-                    case "MEMORY" -> {
-                        EnhancedMiniGames.IntelligenceGames.MemoryChallengeGame game = 
-                            new EnhancedMiniGames.IntelligenceGames.MemoryChallengeGame();
-                        game.generateSequence();
-                        gameSession.put("game", game);
-                    }
-                    case "PUZZLE" -> {
-                        EnhancedMiniGames.IntelligenceGames.PuzzleGame game = 
-                            new EnhancedMiniGames.IntelligenceGames.PuzzleGame(1);
-                        gameSession.put("game", game);
-                    }
-                    case "SPOT_DIFFERENCE" -> {
-                        EnhancedMiniGames.IntelligenceGames.SpotDifferenceGame game = 
-                            new EnhancedMiniGames.IntelligenceGames.SpotDifferenceGame();
-                        game.generateDifferences(5);
-                        gameSession.put("game", game);
-                    }
-                }
-            }
-            case "REACTION" -> {
-                switch (gameType) {
-                    case "SUPER_REACTION" -> {
-                        EnhancedMiniGames.ReactionGames.SuperReactionGame game = 
-                            new EnhancedMiniGames.ReactionGames.SuperReactionGame();
-                        gameSession.put("game", game);
-                    }
-                    case "SHOOTING" -> {
-                        EnhancedMiniGames.ReactionGames.PrecisionShootingGame game = 
-                            new EnhancedMiniGames.ReactionGames.PrecisionShootingGame();
-                        gameSession.put("game", game);
-                    }
-                }
-            }
-            case "RHYTHM" -> {
-                switch (gameType) {
-                    case "DANCE" -> {
-                        EnhancedMiniGames.RhythmGames.MusicDanceGame game = 
-                            new EnhancedMiniGames.RhythmGames.MusicDanceGame();
-                        game.generateBeatmap("default", 1);
-                        gameSession.put("game", game);
-                    }
-                    case "DRUM" -> {
-                        EnhancedMiniGames.RhythmGames.DrumGame game = 
-                            new EnhancedMiniGames.RhythmGames.DrumGame();
-                        gameSession.put("game", game);
-                    }
-                }
-            }
-        }
-        
-        String sessionId = UUID.randomUUID().toString();
-        enhancedGameSessions.put(sessionId, gameSession);
-        
-        return Map.of(
-            "success", true,
-            "sessionId", sessionId,
-            "gameSession", gameSession
-        );
-    }
-    
-    /**
-     * 处理增强版游戏输入
-     */
-    public Map<String, Object> processEnhancedGameInput(String sessionId, Map<String, Object> input) {
-        Map<String, Object> gameSession = enhancedGameSessions.get(sessionId);
-        if (gameSession == null) {
-            return Map.of("success", false, "message", "游戏会话不存在");
-        }
-        
-        Object gameObj = gameSession.get("game");
-        String category = gameSession.get("category").toString();
-        
-        // 根据游戏类型处理输入
-        // 这里需要根据具体游戏类型实现输入处理逻辑
-        
-        return Map.of("success", true, "gameSession", gameSession);
-    }
-
-    /**
-     * 获取玩家的宠物
-     */
-    public Pet getPet(String playerId) {
-        Pet pet = pets.get(playerId);
-        if (pet != null) {
-            updatePetStatusByTime(pet);
-        }
-        return pet;
-    }
-    
-    /**
-     * 删除玩家的宠物（重新开始游戏）
-     */
-    public boolean deletePet(String playerId) {
-        Pet pet = pets.remove(playerId);
-        if (pet != null) {
-            // 清理玩家的所有数据
-            playerCoins.remove(playerId);
-            playerInventory.remove(playerId);
-            playerAchievements.remove(playerId);
-            playerStats.remove(playerId);
-            
-            // 清理活跃的游戏会话
-            activeSessions.entrySet().removeIf(entry -> 
-                entry.getValue().getPlayerId().equals(playerId));
-            
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * 执行宠物动作
-     */
-    public ActionResult executeAction(String playerId, PetAction action) {
-        Pet pet = getPet(playerId);
-        if (pet == null) {
-            return new ActionResult(false, "没有找到宠物", null);
-        }
-        
-        // 验证动作是否为空
-        if (action == null) {
-            return new ActionResult(false, "动作不能为空", pet);
-        }
-
-        if (!action.canExecute(pet)) {
-            return new ActionResult(false, "现在无法执行这个动作", pet);
-        }
-
-        // 应用动作效果
-        action.getEffect().applyTo(pet.getStats());
-        pet.updateLastInteraction();
-        
-        // 获得经验值
-        boolean leveledUp = pet.getStats().addExperience(10);
-        
-        // 有概率获得金币
-        int coinsEarned = 0;
-        if (Math.random() < 0.3) { // 30%概率
-            coinsEarned = 5 + (int)(Math.random() * 10);
-            addCoins(playerId, coinsEarned);
-        }
-
-        // 更新成就进度
-        List<Achievement> newlyUnlocked = new ArrayList<>();
-        switch (action) {
-            case FEED, FEED_TREAT, FEED_MEDICINE -> {
-                newlyUnlocked.addAll(updateAchievement(playerId, Achievement.AchievementType.FEED_COUNT, 1));
-                updatePlayerStat(playerId, "feed_count", 1);
-            }
-            case PLAY -> {
-                newlyUnlocked.addAll(updateAchievement(playerId, Achievement.AchievementType.PLAY_COUNT, 1));
-                updatePlayerStat(playerId, "play_count", 1);
-            }
-        }
-        
-        // 检查等级成就
-        newlyUnlocked.addAll(setAchievementProgress(playerId, Achievement.AchievementType.LEVEL_REACHED, pet.getStats().getLevel()));
-        
-        // 检查快乐度成就
-        newlyUnlocked.addAll(setAchievementProgress(playerId, Achievement.AchievementType.PET_HAPPINESS, pet.getStats().getHappiness()));
-        
-        // 检查金币成就
-        if (coinsEarned > 0) {
-            newlyUnlocked.addAll(updateAchievement(playerId, Achievement.AchievementType.COINS_EARNED, coinsEarned));
-        }
-
-        String message = action.getExecuteMessage(pet);
-        if (leveledUp) {
-            message += "\n🎉 " + pet.getName() + " 升级了！现在是 " + pet.getStats().getLevel() + " 级！";
-        }
-        if (coinsEarned > 0) {
-            message += "\n💰 获得了 " + coinsEarned + " 金币！";
-        }
-        
-        // 显示新解锁的成就
-        for (Achievement achievement : newlyUnlocked) {
-            message += "\n🏆 解锁成就：" + achievement.getName() + " " + achievement.getEmoji();
-        }
-
-        return new ActionResult(true, message, pet);
-    }
-
-    /**
-     * 使用物品
-     */
-    public ActionResult useItem(String playerId, String itemId) {
-        Pet pet = getPet(playerId);
-        if (pet == null) {
-            return new ActionResult(false, "没有找到宠物", null);
-        }
-
-        GameItem item = gameItems.get(itemId);
-        if (item == null) {
-            return new ActionResult(false, "物品不存在", pet);
-        }
-
-        if (!hasItem(playerId, itemId)) {
-            return new ActionResult(false, "你没有这个物品", pet);
-        }
-
-        if (!item.canUseOn(pet)) {
-            return new ActionResult(false, item.getName() + " 现在无法使用", pet);
-        }
-
-        // 使用物品
-        String message = item.useOn(pet);
-        removeItem(playerId, itemId);
-
-        return new ActionResult(true, message, pet);
-    }
-
-    /**
-     * 购买物品
-     */
-    public ActionResult buyItem(String playerId, String itemId) {
-        GameItem item = gameItems.get(itemId);
-        if (item == null) {
-            return new ActionResult(false, "物品不存在", null);
-        }
-
-        if (!item.isUnlocked()) {
-            return new ActionResult(false, "物品尚未解锁", null);
-        }
-
-        int playerCoins = getCoins(playerId);
-        if (playerCoins < item.getCost()) {
-            return new ActionResult(false, "金币不足！需要 " + item.getCost() + " 金币", null);
-        }
-
-        // 扣除金币并添加物品
-        addCoins(playerId, -item.getCost());
-        addItem(playerId, itemId);
-        
-        // 更新购买成就
-        List<Achievement> newlyUnlocked = updateAchievement(playerId, Achievement.AchievementType.ITEMS_BOUGHT, 1);
-        updatePlayerStat(playerId, "items_bought", 1);
-
-        String message = "成功购买了 " + item.getName() + " " + item.getEmoji();
-        for (Achievement achievement : newlyUnlocked) {
-            message += "\n🏆 解锁成就：" + achievement.getName() + " " + achievement.getEmoji();
-        }
-
-        return new ActionResult(true, message, null);
-    }
-
-    /**
-     * 获取玩家金币
-     */
-    public int getCoins(String playerId) {
-        return playerCoins.getOrDefault(playerId, 0);
-    }
-
-    /**
-     * 添加金币
-     */
-    public void addCoins(String playerId, int amount) {
-        int current = getCoins(playerId);
-        playerCoins.put(playerId, Math.max(0, current + amount));
-    }
-
-    /**
-     * 获取玩家物品列表
-     */
-    public List<GameItem> getPlayerItems(String playerId) {
-        List<String> itemIds = playerInventory.getOrDefault(playerId, new ArrayList<>());
-        List<GameItem> items = new ArrayList<>();
-        for (String itemId : itemIds) {
-            GameItem item = gameItems.get(itemId);
-            if (item != null) {
-                items.add(item);
-            }
-        }
-        return items;
-    }
-
-    /**
-     * 获取商店物品列表
-     */
-    public List<GameItem> getShopItems() {
-        return gameItems.values().stream()
-                .filter(GameItem::isUnlocked)
-                .sorted(Comparator.comparing(GameItem::getRarity))
-                .toList();
-    }
-
-    /**
-     * 获取宠物可执行的动作
-     */
-    public List<PetAction> getAvailableActions(String playerId) {
-        Pet pet = getPet(playerId);
-        if (pet == null) {
-            return Collections.emptyList();
-        }
-
-        return Arrays.stream(PetAction.values())
-                .filter(action -> action.canExecute(pet))
-                .toList();
-    }
-    
-    /**
-     * 获取宠物可执行动作的详细信息（用于前端显示）
-     */
-    public List<ActionInfo> getAvailableActionInfo(String playerId) {
-        Pet pet = getPet(playerId);
-        if (pet == null) {
-            return Collections.emptyList();
-        }
-
-        return Arrays.stream(PetAction.values())
-                .filter(action -> action.canExecute(pet))
-                .map(action -> new ActionInfo(
-                    action.name(),
-                    action.getDisplayName(),
-                    action.getEmoji(),
-                    action.getDescription()
-                ))
-                .toList();
-    }
-    
-    /**
-     * 动作信息类
-     */
-    public static class ActionInfo {
-        private String name;
-        private String displayName;
-        private String emoji;
-        private String description;
-        
-        public ActionInfo(String name, String displayName, String emoji, String description) {
-            this.name = name;
-            this.displayName = displayName;
-            this.emoji = emoji;
-            this.description = description;
-        }
-        
-        // Getters
-        public String getName() { return name; }
-        public String getDisplayName() { return displayName; }
-        public String getEmoji() { return emoji; }
-        public String getDescription() { return description; }
-    }
-
-    /**
-     * 随时间更新宠物状态
-     */
-    private void updatePetStatusByTime(Pet pet) {
-        LocalDateTime now = LocalDateTime.now();
-        Duration timePassed = Duration.between(pet.getLastInteraction(), now);
-        long hoursAway = timePassed.toHours();
-
-        if (hoursAway > 0) {
+        if (minutesPassed > 0) {
             PetStats stats = pet.getStats();
             
-            // 随时间减少的状态（每小时减少一定数值）
-            int hungerDecrease = (int) Math.min(hoursAway * 3, 30);
-            int cleanlinessDecrease = (int) Math.min(hoursAway * 2, 20);
-            int happinessDecrease = (int) Math.min(hoursAway * 1, 15);
+            // 饥饿度增加
+            stats.setHunger(Math.min(100, stats.getHunger() + (int)(minutesPassed / 5)));
             
-            stats.updateStat("hunger", stats.getHunger() - hungerDecrease);
-            stats.updateStat("cleanliness", stats.getCleanliness() - cleanlinessDecrease);
-            stats.updateStat("happiness", stats.getHappiness() - happinessDecrease);
-
-            // 如果宠物在睡觉，恢复能量
-            if (pet.isAsleep()) {
-                int energyIncrease = (int) Math.min(hoursAway * 10, 50);
-                stats.updateStat("energy", stats.getEnergy() + energyIncrease);
-                
-                // 睡够了就醒来
-                if (stats.getEnergy() >= 80) {
-                    pet.setAsleep(false);
-                }
+            // 清洁度下降
+            stats.setCleanliness(Math.max(0, stats.getCleanliness() - (int)(minutesPassed / 10)));
+            
+            // 能量自然恢复（如果宠物在休息）
+            if (stats.getEnergy() < 50) {
+                stats.setEnergy(Math.min(100, stats.getEnergy() + (int)(minutesPassed / 3)));
             }
-
-            // 更新心情
-            updatePetMood(pet);
+            
+            // 如果饥饿或脏乱，快乐度下降
+            if (stats.getHunger() > 70 || stats.getCleanliness() < 30) {
+                stats.setHappiness(Math.max(0, stats.getHappiness() - (int)(minutesPassed / 8)));
+            }
+            
+            // 如果太久没互动，快乐度和忠诚度下降
+            if (minutesPassed > 60) {
+                stats.setHappiness(Math.max(0, stats.getHappiness() - (int)((minutesPassed - 60) / 15)));
+                stats.setLoyalty(Math.max(0, stats.getLoyalty() - (int)((minutesPassed - 60) / 30)));
+            }
+            
+            petLastInteraction.put(petId, LocalDateTime.now());
         }
+        
+        return pet;
     }
-
-    /**
-     * 更新宠物心情
-     */
-    private void updatePetMood(Pet pet) {
-        PetStats stats = pet.getStats();
-        int avgStats = (stats.getHunger() + stats.getCleanliness() + 
-                       stats.getHappiness() + stats.getEnergy() + stats.getHealth()) / 5;
-
-        String newMood = switch (avgStats / 20) {
-            case 0, 1 -> "sick";
-            case 2 -> "sad";
-            case 3 -> "okay";
-            case 4 -> "happy";
-            default -> "excited";
-        };
-
-        pet.setMood(newMood);
-    }
-
-    // 物品管理辅助方法
-    private boolean hasItem(String playerId, String itemId) {
-        List<String> items = playerInventory.getOrDefault(playerId, new ArrayList<>());
-        return items.contains(itemId);
-    }
-
-    private void addItem(String playerId, String itemId) {
-        List<String> items = playerInventory.computeIfAbsent(playerId, k -> new ArrayList<>());
-        items.add(itemId);
-    }
-
-    private void removeItem(String playerId, String itemId) {
-        List<String> items = playerInventory.get(playerId);
-        if (items != null) {
-            items.remove(itemId);
-        }
-    }
-
-    // ================= 小游戏系统 =================
     
     /**
      * 开始小游戏
      */
-    public MiniGame.GameResult startMiniGame(String playerId, MiniGame.GameType gameType) {
-        Pet pet = getPet(playerId);
+    public Map<String, Object> startMiniGame(String petId, String gameType) {
+        Pet pet = pets.get(petId);
         if (pet == null) {
-            return new MiniGame.GameResult(false, "没有找到宠物", null);
+            throw new RuntimeException("宠物不存在");
         }
-
-        // 检查宠物状态
-        if (pet.getStats().getEnergy() < 20) {
-            return new MiniGame.GameResult(false, "宠物太累了，无法玩游戏", null);
+        
+        PetStats stats = pet.getStats();
+        if (stats.getEnergy() < 15) {
+            throw new RuntimeException("宠物能量不足");
         }
-
-        // 创建游戏会话
-        MiniGame.GameSession session = new MiniGame.GameSession(playerId, gameType);
-        activeSessions.put(session.getSessionId(), session);
-
-        // 初始化游戏数据
+        
+        Map<String, Object> gameData = new HashMap<>();
+        gameData.put("gameType", gameType);
+        gameData.put("petId", petId);
+        
         switch (gameType) {
-            case MEMORY -> {
-                session.setState(MiniGame.GameState.PLAYING);
-                List<String> sequence = MiniGame.MemoryGameGenerator.generateSequence(3);
-                session.putGameData("sequence", sequence);
-                session.putGameData("playerSequence", new ArrayList<String>());
-            }
-            case REACTION -> {
-                session.setState(MiniGame.GameState.PLAYING);
-                Map<String, Object> targets = MiniGame.ReactionGameGenerator.generateTargets(5);
-                session.putGameData("targets", targets);
-                session.putGameData("correctClicks", 0);
-                session.putGameData("totalClicks", 0);
-            }
-            case PUZZLE -> {
-                session.setState(MiniGame.GameState.WAITING_INPUT);
-                MiniGame.PuzzleQuestion question = MiniGame.PuzzleGameGenerator.getRandomQuestion();
-                session.putGameData("question", question);
-            }
-            case TAP -> {
-                session.setState(MiniGame.GameState.PLAYING);
-                session.putGameData("taps", 0);
-                session.putGameData("timeLimit", 10); // 10秒限时
-                session.putGameData("startTime", System.currentTimeMillis());
-            }
+            case "MEMORY_CHALLENGE":
+                gameData.put("sequence", generateMemorySequence());
+                gameData.put("difficulty", Math.min(5, stats.getLevel()));
+                break;
+            case "REACTION_TEST":
+                gameData.put("targets", generateReactionTargets());
+                gameData.put("timeLimit", Math.max(5, 15 - stats.getLevel()));
+                break;
+            case "RHYTHM_GAME":
+                gameData.put("pattern", generateRhythmPattern());
+                gameData.put("speed", Math.min(3.0, 1.0 + stats.getLevel() * 0.2));
+                break;
         }
-
-        return new MiniGame.GameResult(true, "游戏开始！", session);
+        
+        return gameData;
     }
-
-    /**
-     * 处理游戏输入
-     */
-    public MiniGame.GameResult processGameInput(String sessionId, Map<String, Object> input) {
-        MiniGame.GameSession session = activeSessions.get(sessionId);
-        if (session == null) {
-            return new MiniGame.GameResult(false, "游戏会话不存在", null);
-        }
-
-        switch (session.getGameType()) {
-            case MEMORY -> {
-                return processMemoryGameInput(session, input);
-            }
-            case REACTION -> {
-                return processReactionGameInput(session, input);
-            }
-            case PUZZLE -> {
-                return processPuzzleGameInput(session, input);
-            }
-            case TAP -> {
-                return processTapGameInput(session, input);
-            }
-        }
-
-        return new MiniGame.GameResult(false, "未知游戏类型", session);
-    }
-
-    private MiniGame.GameResult processMemoryGameInput(MiniGame.GameSession session, Map<String, Object> input) {
-        @SuppressWarnings("unchecked")
-        List<String> sequence = (List<String>) session.getGameData("sequence");
-        @SuppressWarnings("unchecked")
-        List<String> playerSequence = (List<String>) session.getGameData("playerSequence");
-        
-        String playerInput = (String) input.get("selection");
-        playerSequence.add(playerInput);
-
-        if (playerSequence.size() <= sequence.size()) {
-            // 检查到目前为止是否正确
-            for (int i = 0; i < playerSequence.size(); i++) {
-                if (!sequence.get(i).equals(playerSequence.get(i))) {
-                    return finishGame(session, false, "记忆错误！正确答案是：" + String.join(" ", sequence));
-                }
-            }
-
-            if (playerSequence.size() == sequence.size()) {
-                // 完成一轮
-                session.addScore(10 * sequence.size());
-                session.setCurrentRound(session.getCurrentRound() + 1);
-                
-                if (session.getCurrentRound() >= session.getMaxRounds()) {
-                    return finishGame(session, true, "恭喜！记忆游戏完成！");
-                } else {
-                    // 下一轮，序列更长
-                    List<String> newSequence = MiniGame.MemoryGameGenerator.generateSequence(sequence.size() + 1);
-                    session.putGameData("sequence", newSequence);
-                    session.putGameData("playerSequence", new ArrayList<String>());
-                    return new MiniGame.GameResult(true, "进入下一轮！", session);
-                }
-            } else {
-                return new MiniGame.GameResult(true, "继续输入...", session);
-            }
-        }
-
-        return new MiniGame.GameResult(false, "输入过多", session);
-    }
-
-    private MiniGame.GameResult processReactionGameInput(MiniGame.GameSession session, Map<String, Object> input) {
-        int correctClicks = (Integer) session.getGameData("correctClicks");
-        int totalClicks = (Integer) session.getGameData("totalClicks");
-        
-        boolean clickedTarget = (Boolean) input.getOrDefault("isTarget", false);
-        totalClicks++;
-        
-        if (clickedTarget) {
-            correctClicks++;
-            session.addScore(5);
-        } else {
-            session.addScore(-2); // 错误点击扣分
-        }
-        
-        session.putGameData("correctClicks", correctClicks);
-        session.putGameData("totalClicks", totalClicks);
-        
-        if (totalClicks >= 10) {
-            double accuracy = (double) correctClicks / totalClicks;
-            if (accuracy >= 0.7) {
-                return finishGame(session, true, String.format("反应游戏完成！准确率：%.1f%%", accuracy * 100));
-            } else {
-                return finishGame(session, false, String.format("反应游戏失败！准确率：%.1f%% (需要70%%以上)", accuracy * 100));
-            }
-        }
-        
-        return new MiniGame.GameResult(true, "继续点击目标！", session);
-    }
-
-    private MiniGame.GameResult processPuzzleGameInput(MiniGame.GameSession session, Map<String, Object> input) {
-        MiniGame.PuzzleQuestion question = (MiniGame.PuzzleQuestion) session.getGameData("question");
-        String answer = (String) input.get("answer");
-        
-        if (question.isCorrect(answer)) {
-            session.addScore(15);
-            session.setCurrentRound(session.getCurrentRound() + 1);
-            
-            if (session.getCurrentRound() >= session.getMaxRounds()) {
-                return finishGame(session, true, "恭喜！猜谜游戏完成！");
-            } else {
-                // 下一题
-                MiniGame.PuzzleQuestion newQuestion = MiniGame.PuzzleGameGenerator.getRandomQuestion();
-                session.putGameData("question", newQuestion);
-                return new MiniGame.GameResult(true, "回答正确！下一题...", session);
-            }
-        } else {
-            return finishGame(session, false, "回答错误！正确答案包括：" + String.join(", ", question.getCorrectAnswers()));
-        }
-    }
-
-    private MiniGame.GameResult processTapGameInput(MiniGame.GameSession session, Map<String, Object> input) {
-        int taps = (Integer) session.getGameData("taps");
-        long startTime = (Long) session.getGameData("startTime");
-        int timeLimit = (Integer) session.getGameData("timeLimit");
-        
-        taps++;
-        session.putGameData("taps", taps);
-        session.addScore(1);
-        
-        long elapsed = (System.currentTimeMillis() - startTime) / 1000;
-        if (elapsed >= timeLimit) {
-            return finishGame(session, true, String.format("拍拍游戏完成！总共拍了 %d 次！", taps));
-        }
-        
-        return new MiniGame.GameResult(true, String.format("继续拍拍！剩余时间：%d秒", timeLimit - elapsed), session);
-    }
-
-    private MiniGame.GameResult finishGame(MiniGame.GameSession session, boolean success, String message) {
-        session.setState(success ? MiniGame.GameState.GAME_COMPLETE : MiniGame.GameState.FAILED);
-        session.setEndTime(LocalDateTime.now());
-        
-        MiniGame.GameResult result = new MiniGame.GameResult(success, message, session);
-        
-        if (success) {
-            // 计算奖励
-            int baseReward = session.getGameType().getMaxReward();
-            int scoreMultiplier = Math.max(1, session.getScore() / 10);
-            int coinsEarned = Math.min(baseReward, scoreMultiplier * 2);
-            int expEarned = coinsEarned / 2;
-            
-            result.setCoinsEarned(coinsEarned);
-            result.setExperienceEarned(expEarned);
-            
-            // 给予奖励
-            addCoins(session.getPlayerId(), coinsEarned);
-            Pet pet = getPet(session.getPlayerId());
-            if (pet != null) {
-                pet.getStats().addExperience(expEarned);
-                pet.updateLastInteraction();
-            }
-            
-            // 更新成就
-            updateAchievement(session.getPlayerId(), Achievement.AchievementType.GAMES_WON, 1);
-            updatePlayerStat(session.getPlayerId(), "games_won", 1);
-        }
-        
-        // 移除活跃会话
-        activeSessions.remove(session.getSessionId());
-        return result;
-    }
-
-    /**
-     * 获取活跃游戏会话
-     */
-    public MiniGame.GameSession getActiveGameSession(String playerId) {
-        return activeSessions.values().stream()
-            .filter(session -> session.getPlayerId().equals(playerId))
-            .findFirst()
-            .orElse(null);
-    }
-
-    // ================= 成就系统 =================
     
     /**
-     * 初始化玩家成就
+     * 完成小游戏
      */
-    private void initializePlayerAchievements(String playerId) {
-        if (!playerAchievements.containsKey(playerId)) {
-            List<Achievement> achievements = new ArrayList<>();
-            for (Achievement template : Achievement.getDefaultAchievements()) {
-                Achievement playerAchievement = new Achievement(
-                    template.getId(), template.getName(), template.getDescription(),
-                    template.getEmoji(), template.getType(), template.getTargetValue(),
-                    template.getReward()
-                );
-                achievements.add(playerAchievement);
-            }
-            playerAchievements.put(playerId, achievements);
+    public Pet completeMiniGame(String petId, String gameType, int score) {
+        Pet pet = pets.get(petId);
+        if (pet == null) {
+            throw new RuntimeException("宠物不存在");
         }
         
-        if (!playerStats.containsKey(playerId)) {
-            playerStats.put(playerId, new ConcurrentHashMap<>());
+        PetStats stats = pet.getStats();
+        
+        // 能量消耗
+        stats.setEnergy(Math.max(0, stats.getEnergy() - 15));
+        
+        // 根据分数给予奖励
+        int experienceGain = score / 10;
+        int happinessGain = score / 20;
+        
+        stats.setHappiness(Math.min(100, stats.getHappiness() + happinessGain));
+        addExperience(pet, experienceGain);
+        
+        // 根据游戏类型增加相应属性
+        switch (gameType) {
+            case "MEMORY_CHALLENGE":
+                stats.setIntelligence(Math.min(100, stats.getIntelligence() + score / 50));
+                break;
+            case "REACTION_TEST":
+                stats.setAgility(Math.min(100, stats.getAgility() + score / 50));
+                break;
+            case "RHYTHM_GAME":
+                stats.setIntelligence(Math.min(100, stats.getIntelligence() + score / 100));
+                stats.setAgility(Math.min(100, stats.getAgility() + score / 100));
+                break;
         }
+        
+        // 检查游戏成就
+        checkGameAchievements(pet.getPlayerId(), gameType, score);
+        
+        // 记录交互时间
+        pet.setLastInteraction(LocalDateTime.now());
+        petLastInteraction.put(petId, LocalDateTime.now());
+        
+        return pet;
     }
-
+    
     /**
-     * 更新成就进度
+     * 获取宠物信息
      */
-    public List<Achievement> updateAchievement(String playerId, Achievement.AchievementType type, int value) {
-        initializePlayerAchievements(playerId);
-        
-        List<Achievement> playerAchievements = this.playerAchievements.get(playerId);
-        List<Achievement> newlyUnlocked = new ArrayList<>();
-        
-        for (Achievement achievement : playerAchievements) {
-            if (achievement.getType() == type && !achievement.isUnlocked()) {
-                boolean unlocked = achievement.updateProgress(value);
-                if (unlocked) {
-                    newlyUnlocked.add(achievement);
-                    // 给予奖励
-                    addCoins(playerId, achievement.getReward().getCoins());
-                    Pet pet = getPet(playerId);
-                    if (pet != null) {
-                        pet.getStats().addExperience(achievement.getReward().getExperience());
-                        
-                        // 特殊物品奖励
-                        if (achievement.getReward().getSpecialItem() != null) {
-                            addItem(playerId, achievement.getReward().getSpecialItem());
-                        }
-                    }
-                }
-            }
-        }
-        
-        return newlyUnlocked;
+    public Pet getPet(String petId) {
+        return updatePetStatus(petId);
     }
-
+    
     /**
-     * 设置成就进度（用于绝对值类型）
+     * 获取玩家的所有宠物
      */
-    public List<Achievement> setAchievementProgress(String playerId, Achievement.AchievementType type, int value) {
-        initializePlayerAchievements(playerId);
-        
-        List<Achievement> playerAchievements = this.playerAchievements.get(playerId);
-        List<Achievement> newlyUnlocked = new ArrayList<>();
-        
-        for (Achievement achievement : playerAchievements) {
-            if (achievement.getType() == type && !achievement.isUnlocked()) {
-                boolean unlocked = achievement.setProgress(value);
-                if (unlocked) {
-                    newlyUnlocked.add(achievement);
-                    // 给予奖励
-                    addCoins(playerId, achievement.getReward().getCoins());
-                    Pet pet = getPet(playerId);
-                    if (pet != null) {
-                        pet.getStats().addExperience(achievement.getReward().getExperience());
-                        
-                        // 特殊物品奖励
-                        if (achievement.getReward().getSpecialItem() != null) {
-                            addItem(playerId, achievement.getReward().getSpecialItem());
-                        }
-                    }
-                }
-            }
-        }
-        
-        return newlyUnlocked;
+    public List<Pet> getPlayerPets(String playerId) {
+        return pets.values().stream()
+            .filter(pet -> pet.getPlayerId().equals(playerId))
+            .map(pet -> updatePetStatus(pet.getPetId()))
+            .collect(Collectors.toList());
     }
-
+    
     /**
-     * 获取玩家成就列表
+     * 获取玩家成就
      */
     public List<Achievement> getPlayerAchievements(String playerId) {
-        initializePlayerAchievements(playerId);
-        return new ArrayList<>(playerAchievements.get(playerId));
+        return playerAchievements.getOrDefault(playerId, new ArrayList<>());
     }
-
+    
     /**
-     * 更新玩家统计数据
+     * 获取玩家背包
      */
-    private void updatePlayerStat(String playerId, String statName, int increment) {
-        Map<String, Integer> stats = playerStats.computeIfAbsent(playerId, k -> new ConcurrentHashMap<>());
-        stats.put(statName, stats.getOrDefault(statName, 0) + increment);
+    public List<GameItem> getPlayerInventory(String playerId) {
+        return playerInventory.getOrDefault(playerId, new ArrayList<>());
     }
-
-    /**
-     * 获取玩家统计数据
-     */
-    public Map<String, Integer> getPlayerStats(String playerId) {
-        return new HashMap<>(playerStats.getOrDefault(playerId, new HashMap<>()));
+    
+    // ============ 私有辅助方法 ============
+    
+    private String generatePetId() {
+        return "pet_" + System.currentTimeMillis() + "_" + random.nextInt(1000);
     }
-
-    /**
-     * 动作执行结果类
-     */
-    public static class ActionResult {
-        private final boolean success;
-        private final String message;
-        private final Pet pet;
-
-        public ActionResult(boolean success, String message, Pet pet) {
-            this.success = success;
-            this.message = message;
-            this.pet = pet;
+    
+    private List<String> generateMemorySequence() {
+        List<String> sequence = new ArrayList<>();
+        String[] colors = {"red", "blue", "green", "yellow", "purple"};
+        int length = 3 + random.nextInt(5);
+        
+        for (int i = 0; i < length; i++) {
+            sequence.add(colors[random.nextInt(colors.length)]);
         }
-
-        public boolean isSuccess() { return success; }
-        public String getMessage() { return message; }
-        public Pet getPet() { return pet; }
+        
+        return sequence;
+    }
+    
+    private List<Map<String, Object>> generateReactionTargets() {
+        List<Map<String, Object>> targets = new ArrayList<>();
+        int count = 3 + random.nextInt(7);
+        
+        for (int i = 0; i < count; i++) {
+            Map<String, Object> target = new HashMap<>();
+            target.put("x", random.nextInt(400));
+            target.put("y", random.nextInt(400));
+            target.put("delay", random.nextInt(2000));
+            targets.add(target);
+        }
+        
+        return targets;
+    }
+    
+    private List<Double> generateRhythmPattern() {
+        List<Double> pattern = new ArrayList<>();
+        int length = 5 + random.nextInt(10);
+        
+        for (int i = 0; i < length; i++) {
+            pattern.add(0.5 + random.nextDouble() * 2.0);
+        }
+        
+        return pattern;
+    }
+    
+    private void unlockAchievement(String playerId, String achievementId, String name, String description, int points) {
+        List<Achievement> achievements = playerAchievements.get(playerId);
+        boolean alreadyUnlocked = achievements.stream()
+            .anyMatch(a -> a.getAchievementId().equals(achievementId));
+        
+        if (!alreadyUnlocked) {
+            Achievement achievement = new Achievement();
+            achievement.setAchievementId(achievementId);
+            achievement.setAchievementName(name);
+            achievement.setDescription(description);
+            achievement.setPoints(points);
+            achievement.setUnlockedAt(LocalDateTime.now());
+            achievements.add(achievement);
+        }
+    }
+    
+    private void checkLevelAchievements(String playerId, int level) {
+        if (level == 5) {
+            unlockAchievement(playerId, "LEVEL_5", "初级训练师", "宠物达到5级", 50);
+        } else if (level == 10) {
+            unlockAchievement(playerId, "LEVEL_10", "中级训练师", "宠物达到10级", 100);
+        } else if (level == 20) {
+            unlockAchievement(playerId, "LEVEL_20", "高级训练师", "宠物达到20级", 200);
+        }
+    }
+    
+    private void checkPlayAchievements(String playerId, String activityType) {
+        // 这里可以添加更复杂的成就检查逻辑
+        if (activityType.equals("FETCH")) {
+            unlockAchievement(playerId, "FIRST_FETCH", "抛接高手", "第一次玩抛接游戏", 25);
+        }
+    }
+    
+    private void checkGameAchievements(String playerId, String gameType, int score) {
+        if (score >= 100) {
+            unlockAchievement(playerId, "GAME_MASTER", "游戏大师", "在小游戏中获得100分", 75);
+        }
     }
 }

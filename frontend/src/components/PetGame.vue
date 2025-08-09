@@ -1,877 +1,941 @@
 <template>
-  <div class="max-w-4xl mx-auto p-4">
-    <!-- 初始化宠物界面 -->
-    <div v-if="!pet" class="text-center">
-      <div class="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-lg mb-6">
-        <h2 class="text-3xl font-bold text-gray-800 mb-4">🏞️ 欢迎来到宠物公园 🏞️</h2>
-        <p class="text-gray-600 mb-6">选择你的专属宠物，开始温馨的养成之旅！</p>
-        
-        <div class="mb-6">
-          <input 
-            v-model="newPetName" 
-            type="text" 
-            placeholder="为你的宠物起个名字..."
-            class="w-full max-w-sm mx-auto px-4 py-3 border-2 border-pink-200 rounded-2xl text-center text-lg focus:outline-none focus:border-pink-400 bg-white/90"
-          />
-        </div>
-
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div 
-            v-for="petType in petTypes" 
-            :key="petType.name"
-            @click="selectedPetType = petType.name"
-            :class="[
-              'cursor-pointer p-4 rounded-2xl border-2 transition-all duration-300 bg-white/90',
-              selectedPetType === petType.name 
-                ? 'border-pink-400 bg-pink-50 transform scale-105' 
-                : 'border-gray-200 hover:border-pink-300 hover:bg-pink-25'
-            ]"
-          >
-            <div class="text-4xl mb-2">{{ petType.emoji }}</div>
-            <div class="font-semibold text-gray-800">{{ petType.displayName }}</div>
-            <div class="text-xs text-gray-600 mt-1">{{ petType.description }}</div>
-          </div>
-        </div>
-
-        <button 
-          @click="createPet"
-          :disabled="!newPetName.trim() || !selectedPetType || creating"
-          class="px-8 py-3 bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold rounded-2xl hover:from-pink-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105"
-        >
-          {{ creating ? '创建中...' : '开始养成 🎉' }}
-        </button>
+  <div class="pet-game min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+    <!-- 加载状态 -->
+    <div v-if="loading" class="flex items-center justify-center min-h-screen">
+      <div class="text-center">
+        <div class="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-500 mx-auto mb-4"></div>
+        <p class="text-lg text-gray-600">加载中...</p>
       </div>
     </div>
 
-    <!-- 游戏主界面 -->
-    <div v-else class="space-y-6">
-      <!-- 宠物信息卡片 -->
-      <div class="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-lg">
-        <div class="flex flex-col md:flex-row items-center gap-6">
-          <!-- 宠物显示区域 -->
-          <div class="relative">
-            <div class="w-48 h-48 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center shadow-inner">
-              <div 
-                :class="['text-8xl transition-transform duration-500', petAnimationClass]"
-                @click="petPet"
-              >
-                {{ pet.type.emoji }}
-              </div>
-            </div>
-            <div class="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-white px-3 py-1 rounded-full shadow-md">
-              <span class="text-sm font-semibold text-gray-700">Lv.{{ pet.stats.level }}</span>
+    <!-- 主游戏界面 -->
+    <div v-else class="container mx-auto px-4 py-6">
+      <!-- 顶部导航栏 -->
+      <header class="bg-white/80 backdrop-blur-sm rounded-2xl p-4 mb-6 shadow-lg">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-4">
+            <h1 class="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+              🐾 宠物乐园 🐾
+            </h1>
+            <div v-if="currentPet" class="text-sm text-gray-600">
+              欢迎回来，{{ currentPet.petName }}！
             </div>
           </div>
-
-          <!-- 宠物状态 -->
-          <div class="flex-1 space-y-4">
-            <div class="text-center md:text-left">
-              <h2 class="text-2xl font-bold text-gray-800">{{ pet.name }}</h2>
-              <p class="text-gray-600">{{ pet.statusDescription }}</p>
-              <p class="text-sm text-gray-500">年龄: {{ petAge }}天 | 经验: {{ pet.stats.experience }}/{{ (pet.stats.level) * 100 }}</p>
+          
+          <div class="flex items-center space-x-4">
+            <!-- 玩家统计 -->
+            <div v-if="playerStats" class="flex items-center space-x-3 text-sm">
+              <div class="bg-yellow-100 px-3 py-1 rounded-full">
+                🏆 {{ playerStats.totalAchievements }} 成就
+              </div>
+              <div class="bg-blue-100 px-3 py-1 rounded-full">
+                ⭐ {{ playerStats.totalAchievementPoints }} 积分
+              </div>
             </div>
+            
+            <!-- 设置按钮 -->
+            <button 
+              @click="showSettings = !showSettings"
+              class="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+            >
+              ⚙️
+            </button>
+          </div>
+        </div>
+      </header>
 
-            <!-- 状态条 -->
-            <div class="grid grid-cols-2 gap-3">
-              <div v-for="(stat, name) in displayStats" :key="name" class="space-y-1">
-                <div class="flex justify-between text-sm">
-                  <span class="font-medium">{{ stat.name }} {{ stat.emoji }}</span>
-                  <span class="text-gray-600">{{ stat.value }}/100</span>
+      <!-- 宠物创建界面 -->
+      <div v-if="!currentPet && !showPetList" class="text-center">
+        <div class="bg-white/80 backdrop-blur-sm rounded-3xl p-8 max-w-md mx-auto shadow-lg">
+          <h2 class="text-3xl font-bold mb-4">🌟 开始你的宠物之旅 🌟</h2>
+          <p class="text-gray-600 mb-6">创造你的第一个专属宠物，开启奇妙的陪伴旅程！</p>
+          <button 
+            @click="showCustomizer = true"
+            class="px-8 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:from-purple-600 hover:to-pink-600 transition-all duration-300 transform hover:scale-105"
+          >
+            🎨 创造宠物
+          </button>
+        </div>
+      </div>
+
+      <!-- 宠物列表界面 -->
+      <div v-else-if="showPetList" class="space-y-6">
+        <div class="flex items-center justify-between">
+          <h2 class="text-2xl font-bold">我的宠物</h2>
+          <button 
+            @click="showCustomizer = true"
+            class="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+          >
+            ➕ 创建新宠物
+          </button>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div 
+            v-for="pet in pets" 
+            :key="pet.petId"
+            @click="selectPet(pet)"
+            class="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+          >
+            <div class="text-center">
+              <PetRenderer 
+                :appearance="pet.appearance"
+                :size="150"
+                :interactive="false"
+              />
+              <h3 class="text-lg font-semibold mt-4">{{ pet.petName }}</h3>
+              <div class="text-sm text-gray-600 mt-2">
+                <p>等级 {{ pet.stats.level }} | 经验 {{ pet.stats.experience }}</p>
+                <p>快乐度 {{ pet.stats.happiness }}% | 健康 {{ pet.stats.health }}%</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 主游戏界面 -->
+      <div v-else-if="currentPet" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- 左侧：宠物展示区 -->
+        <div class="lg:col-span-2 space-y-6">
+          <!-- 宠物显示区域 -->
+          <div class="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-lg">
+            <div class="flex justify-center mb-6">
+              <PetRenderer 
+                :appearance="currentPet.appearance"
+                :size="300"
+                :interactive="true"
+                :show-effects="true"
+                @click="handlePetClick"
+              />
+            </div>
+            
+            <!-- 宠物状态显示 -->
+            <div class="bg-gray-50 rounded-2xl p-4">
+              <h3 class="text-lg font-semibold mb-3 text-center">{{ currentPet.petName }} 的状态</h3>
+              <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-2">
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm">❤️ 健康</span>
+                    <span class="text-sm font-semibold">{{ currentPet.stats.health }}%</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      class="bg-red-500 h-2 rounded-full transition-all duration-300"
+                      :style="{ width: currentPet.stats.health + '%' }"
+                    ></div>
+                  </div>
+                  
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm">😊 快乐</span>
+                    <span class="text-sm font-semibold">{{ currentPet.stats.happiness }}%</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      class="bg-yellow-500 h-2 rounded-full transition-all duration-300"
+                      :style="{ width: currentPet.stats.happiness + '%' }"
+                    ></div>
+                  </div>
+                  
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm">⚡ 能量</span>
+                    <span class="text-sm font-semibold">{{ currentPet.stats.energy }}%</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      class="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                      :style="{ width: currentPet.stats.energy + '%' }"
+                    ></div>
+                  </div>
                 </div>
-                <div class="w-full bg-gray-200 rounded-full h-2">
+                
+                <div class="space-y-2">
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm">🍎 饥饿</span>
+                    <span class="text-sm font-semibold">{{ currentPet.stats.hunger }}%</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      class="bg-orange-500 h-2 rounded-full transition-all duration-300"
+                      :style="{ width: currentPet.stats.hunger + '%' }"
+                    ></div>
+                  </div>
+                  
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm">🧼 清洁</span>
+                    <span class="text-sm font-semibold">{{ currentPet.stats.cleanliness }}%</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      class="bg-green-500 h-2 rounded-full transition-all duration-300"
+                      :style="{ width: currentPet.stats.cleanliness + '%' }"
+                    ></div>
+                  </div>
+                  
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm">💖 忠诚</span>
+                    <span class="text-sm font-semibold">{{ currentPet.stats.loyalty }}%</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      class="bg-pink-500 h-2 rounded-full transition-all duration-300"
+                      :style="{ width: currentPet.stats.loyalty + '%' }"
+                    ></div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- 等级和经验 -->
+              <div class="mt-4 p-3 bg-purple-50 rounded-lg">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-sm font-semibold">等级 {{ currentPet.stats.level }}</span>
+                  <span class="text-sm">经验 {{ currentPet.stats.experience }} / {{ currentPet.stats.level * 100 }}</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-3">
                   <div 
-                    :class="['h-2 rounded-full transition-all duration-500', stat.color]"
-                    :style="{ width: `${Math.max(0, Math.min(100, stat.value))}%` }"
+                    class="bg-purple-500 h-3 rounded-full transition-all duration-300"
+                    :style="{ width: (currentPet.stats.experience / (currentPet.stats.level * 100)) * 100 + '%' }"
                   ></div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- 金币显示和重新开始按钮 -->
-          <div class="space-y-3">
-            <div class="bg-yellow-100 px-4 py-2 rounded-2xl shadow-inner">
-              <div class="text-center">
-                <div class="text-2xl">💰</div>
-                <div class="font-bold text-yellow-700">{{ coins }}</div>
-                <div class="text-xs text-yellow-600">金币</div>
-              </div>
-            </div>
-            
-            <!-- 重新开始按钮 -->
-            <button 
-              @click="resetGame"
-              class="w-full px-3 py-2 bg-gradient-to-r from-gray-400 to-gray-500 text-white text-sm rounded-xl hover:from-gray-500 hover:to-gray-600 transition-all duration-300"
-            >
-              🔄 重新开始
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 小游戏界面 -->
-      <div v-if="activeGameSession" class="bg-white/90 backdrop-blur-sm rounded-3xl p-6 shadow-lg">
-        <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">
-          🎮 {{ activeGameSession.gameType.displayName }}
-        </h3>
-        
-        <!-- 记忆游戏 -->
-        <div v-if="activeGameSession.gameType.name === 'MEMORY'" class="text-center">
-          <div v-if="currentSequence" class="mb-4">
-            <p class="text-gray-600 mb-2">记住这个序列：</p>
-            <div class="flex justify-center gap-2 mb-4">
-              <span v-for="emoji in currentSequence" :key="emoji" class="text-2xl">{{ emoji }}</span>
-            </div>
-            <p class="text-sm text-gray-500">现在请按顺序点击：</p>
-            <div class="grid grid-cols-5 gap-2 mt-2">
-              <button 
-                v-for="emoji in memoryOptions" 
-                :key="emoji"
-                @click="selectMemoryItem(emoji)"
-                class="p-2 text-2xl bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors"
-              >
-                {{ emoji }}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- 猜谜游戏 -->
-        <div v-if="activeGameSession.gameType.name === 'PUZZLE'" class="text-center">
-          <div v-if="currentQuestion" class="mb-4">
-            <p class="text-lg font-medium mb-4">{{ currentQuestion.question }}</p>
-            <input 
-              v-model="puzzleAnswer"
-              @keyup.enter="submitPuzzleAnswer"
-              type="text" 
-              placeholder="请输入答案..."
-              class="w-full max-w-sm mx-auto px-4 py-2 border-2 border-blue-200 rounded-xl text-center focus:outline-none focus:border-blue-400"
+          <!-- 小游戏区域 -->
+          <div v-if="currentGame" class="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-lg">
+            <MiniGamePlayer 
+              :game-data="currentGame"
+              @game-complete="handleGameComplete"
+              @game-cancel="currentGame = null"
             />
-            <button 
-              @click="submitPuzzleAnswer"
-              class="mt-2 px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors"
-            >
-              提交答案
-            </button>
           </div>
         </div>
 
-        <!-- 拍拍游戏 -->
-        <div v-if="activeGameSession.gameType.name === 'TAP'" class="text-center">
-          <p class="text-lg font-medium mb-4">快速点击宠物！</p>
-          <div 
-            @click="tapPet"
-            class="w-32 h-32 mx-auto bg-gradient-to-br from-pink-200 to-purple-200 rounded-full flex items-center justify-center cursor-pointer hover:scale-105 transition-transform text-6xl"
-          >
-            {{ pet.type.emoji }}
-          </div>
-          <p class="mt-2 text-sm text-gray-600">
-            拍击次数: {{ tapCount }} | 剩余时间: {{ timeRemaining }}秒
-          </p>
-        </div>
-
-        <div class="mt-4 text-center">
-          <p class="text-sm text-gray-600">得分: {{ activeGameSession.score }}</p>
-          <p class="text-sm text-gray-600">轮次: {{ activeGameSession.currentRound }}/{{ activeGameSession.maxRounds }}</p>
-        </div>
-      </div>
-
-      <!-- 操作按钮区域 -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <!-- 互动动作 -->
-        <div class="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg">
-          <h3 class="text-lg font-bold text-gray-800 mb-3 text-center">🎮 互动动作</h3>
-          <div class="grid grid-cols-2 gap-2">
-            <button
-              v-for="action in availableActions"
-              :key="action.name"
-              @click="executeAction(action.name)"
-              :disabled="executing"
-              class="p-3 bg-gradient-to-r from-blue-400 to-purple-500 text-white rounded-xl hover:from-blue-500 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 text-sm font-medium"
-            >
-              {{ action.emoji }} {{ action.displayName }}
-            </button>
-          </div>
-        </div>
-
-        <!-- 物品栏 -->
-        <div class="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg">
-          <h3 class="text-lg font-bold text-gray-800 mb-3 text-center">🎒 我的物品</h3>
-          <div class="space-y-2 max-h-48 overflow-y-auto">
-            <div 
-              v-for="item in inventory" 
-              :key="item.id"
-              class="flex items-center justify-between p-2 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
-            >
-              <div class="flex items-center gap-2">
-                <span class="text-lg">{{ item.emoji }}</span>
-                <span class="text-sm font-medium">{{ item.name }}</span>
-              </div>
-              <button
-                @click="useItem(item.id)"
-                :disabled="executing"
-                class="px-2 py-1 bg-green-500 text-white text-xs rounded-lg hover:bg-green-600 disabled:opacity-50"
+        <!-- 右侧：操作面板 -->
+        <div class="space-y-6">
+          <!-- 快速操作 -->
+          <div class="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg">
+            <h3 class="text-lg font-semibold mb-4">快速操作</h3>
+            <div class="grid grid-cols-2 gap-3">
+              <button 
+                @click="feedPet"
+                class="p-3 bg-orange-100 hover:bg-orange-200 rounded-xl transition-colors text-center"
+                :disabled="actionLoading"
               >
-                使用
+                <div class="text-2xl mb-1">🍎</div>
+                <div class="text-xs">喂食</div>
+              </button>
+              
+              <button 
+                @click="cleanPet"
+                class="p-3 bg-blue-100 hover:bg-blue-200 rounded-xl transition-colors text-center"
+                :disabled="actionLoading"
+              >
+                <div class="text-2xl mb-1">🧼</div>
+                <div class="text-xs">清洁</div>
+              </button>
+              
+              <button 
+                @click="restPet"
+                class="p-3 bg-green-100 hover:bg-green-200 rounded-xl transition-colors text-center"
+                :disabled="actionLoading"
+              >
+                <div class="text-2xl mb-1">😴</div>
+                <div class="text-xs">休息</div>
+              </button>
+              
+              <button 
+                @click="playWithPet('CUDDLE')"
+                class="p-3 bg-pink-100 hover:bg-pink-200 rounded-xl transition-colors text-center"
+                :disabled="actionLoading"
+              >
+                <div class="text-2xl mb-1">🤗</div>
+                <div class="text-xs">拥抱</div>
               </button>
             </div>
-            <div v-if="inventory.length === 0" class="text-center text-gray-500 text-sm py-4">
-              暂无物品
+          </div>
+
+          <!-- 互动游戏 -->
+          <div class="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg">
+            <h3 class="text-lg font-semibold mb-4">互动游戏</h3>
+            <div class="space-y-3">
+              <button 
+                @click="playWithPet('FETCH')"
+                class="w-full p-3 bg-yellow-100 hover:bg-yellow-200 rounded-xl transition-colors flex items-center"
+                :disabled="actionLoading"
+              >
+                <span class="text-xl mr-3">🎾</span>
+                <span class="text-sm">抛接游戏</span>
+              </button>
+              
+              <button 
+                @click="playWithPet('PUZZLE')"
+                class="w-full p-3 bg-purple-100 hover:bg-purple-200 rounded-xl transition-colors flex items-center"
+                :disabled="actionLoading"
+              >
+                <span class="text-xl mr-3">🧩</span>
+                <span class="text-sm">益智游戏</span>
+              </button>
+              
+              <button 
+                @click="playWithPet('EXERCISE')"
+                class="w-full p-3 bg-red-100 hover:bg-red-200 rounded-xl transition-colors flex items-center"
+                :disabled="actionLoading"
+              >
+                <span class="text-xl mr-3">🏃</span>
+                <span class="text-sm">运动训练</span>
+              </button>
             </div>
           </div>
-        </div>
 
-        <!-- 商店 -->
-        <div class="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg">
-          <h3 class="text-lg font-bold text-gray-800 mb-3 text-center">🏪 宠物商店</h3>
-          <div class="space-y-2 max-h-48 overflow-y-auto">
-            <div 
-              v-for="item in shopItems.slice(0, 6)" 
-              :key="item.id"
-              class="flex items-center justify-between p-2 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
-            >
-              <div class="flex items-center gap-2">
-                <span class="text-lg">{{ item.emoji }}</span>
-                <div>
-                  <div class="text-sm font-medium">{{ item.name }}</div>
-                  <div class="text-xs text-gray-600">{{ item.cost }}💰</div>
+          <!-- 小游戏 -->
+          <div class="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg">
+            <h3 class="text-lg font-semibold mb-4">小游戏</h3>
+            <div class="space-y-3">
+              <button 
+                @click="startMiniGame('MEMORY_CHALLENGE')"
+                class="w-full p-3 bg-indigo-100 hover:bg-indigo-200 rounded-xl transition-colors flex items-center"
+                :disabled="actionLoading || currentGame"
+              >
+                <span class="text-xl mr-3">🧠</span>
+                <span class="text-sm">记忆挑战</span>
+              </button>
+              
+              <button 
+                @click="startMiniGame('REACTION_TEST')"
+                class="w-full p-3 bg-teal-100 hover:bg-teal-200 rounded-xl transition-colors flex items-center"
+                :disabled="actionLoading || currentGame"
+              >
+                <span class="text-xl mr-3">⚡</span>
+                <span class="text-sm">反应测试</span>
+              </button>
+              
+              <button 
+                @click="startMiniGame('RHYTHM_GAME')"
+                class="w-full p-3 bg-rose-100 hover:bg-rose-200 rounded-xl transition-colors flex items-center"
+                :disabled="actionLoading || currentGame"
+              >
+                <span class="text-xl mr-3">🎵</span>
+                <span class="text-sm">节奏游戏</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 背包物品 -->
+          <div class="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg">
+            <h3 class="text-lg font-semibold mb-4">背包物品</h3>
+            <div v-if="inventory.length === 0" class="text-center text-gray-500 py-4">
+              背包是空的
+            </div>
+            <div v-else class="space-y-2">
+              <div 
+                v-for="item in inventory" 
+                :key="item.itemId"
+                class="flex items-center justify-between p-2 bg-gray-50 rounded-lg"
+              >
+                <div class="flex items-center">
+                  <span class="text-lg mr-2">📦</span>
+                  <div>
+                    <div class="text-sm font-medium">{{ item.itemName }}</div>
+                    <div class="text-xs text-gray-500">数量: {{ item.quantity }}</div>
+                  </div>
                 </div>
+                <button 
+                  v-if="item.itemType === 'CONSUMABLE'"
+                  @click="useItem(item.itemId)"
+                  class="px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600"
+                  :disabled="actionLoading"
+                >
+                  使用
+                </button>
               </div>
-              <button
-                @click="buyItem(item.id)"
-                :disabled="executing || coins < item.cost"
-                class="px-2 py-1 bg-yellow-500 text-white text-xs rounded-lg hover:bg-yellow-600 disabled:opacity-50"
-              >
-                购买
-              </button>
             </div>
           </div>
         </div>
+      </div>
+    </div>
 
-        <!-- 小游戏 -->
-        <div class="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg">
-          <h3 class="text-lg font-bold text-gray-800 mb-3 text-center">🎮 小游戏</h3>
-          <div v-if="!activeGameSession" class="space-y-2">
-            <button
-              v-for="gameType in gameTypes"
-              :key="gameType.name"
-              @click="startMiniGame(gameType.name)"
-              :disabled="executing || (pet.stats.energy < 20)"
-              class="w-full p-2 bg-gradient-to-r from-purple-400 to-pink-500 text-white rounded-xl hover:from-purple-500 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 text-sm font-medium"
+    <!-- 宠物自定义器模态框 -->
+    <div v-if="showCustomizer" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-3xl max-w-6xl w-full max-h-[90vh] overflow-auto">
+        <PetCustomizer @pet-created="handlePetCreated" />
+        <div class="p-4 border-t">
+          <button 
+            @click="showCustomizer = false"
+            class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
+          >
+            取消
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 成就通知 -->
+    <div 
+      v-if="showAchievementNotification"
+      class="fixed top-4 right-4 bg-yellow-400 text-yellow-900 p-4 rounded-lg shadow-lg z-50 transform transition-all duration-300"
+      :class="showAchievementNotification ? 'translate-x-0' : 'translate-x-full'"
+    >
+      <div class="flex items-center">
+        <span class="text-2xl mr-3">🏆</span>
+        <div>
+          <div class="font-semibold">新成就解锁！</div>
+          <div class="text-sm">{{ latestAchievement?.achievementName }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部切换栏 -->
+    <nav v-if="pets.length > 0" class="fixed bottom-4 left-4 right-4 z-40">
+      <div class="bg-white/90 backdrop-blur-sm rounded-2xl p-2 shadow-lg max-w-md mx-auto">
+        <div class="flex justify-around">
+          <button 
+            @click="showPetList = false"
+            :class="['p-3 rounded-xl transition-colors', !showPetList ? 'bg-purple-100 text-purple-600' : 'text-gray-600 hover:bg-gray-100']"
+          >
+            <div class="text-xl">🏠</div>
+            <div class="text-xs">主页</div>
+          </button>
+          
+          <button 
+            @click="showPetList = true"
+            :class="['p-3 rounded-xl transition-colors', showPetList ? 'bg-purple-100 text-purple-600' : 'text-gray-600 hover:bg-gray-100']"
+          >
+            <div class="text-xl">🐾</div>
+            <div class="text-xs">宠物</div>
+          </button>
+          
+          <button 
+            @click="showAchievements = true"
+            class="p-3 rounded-xl text-gray-600 hover:bg-gray-100 transition-colors"
+          >
+            <div class="text-xl">🏆</div>
+            <div class="text-xs">成就</div>
+          </button>
+        </div>
+      </div>
+    </nav>
+
+    <!-- 成就面板 -->
+    <div v-if="showAchievements" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-3xl max-w-2xl w-full max-h-[80vh] overflow-auto">
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-2xl font-bold">🏆 成就系统</h2>
+            <button 
+              @click="showAchievements = false"
+              class="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
             >
-              {{ gameType.emoji }} {{ gameType.displayName }}
+              ✕
             </button>
           </div>
-          <div v-else class="text-center">
-            <p class="text-sm text-gray-600 mb-2">游戏进行中...</p>
-            <p class="text-xs text-gray-500">{{ activeGameSession.gameType.description }}</p>
+          
+          <div v-if="achievements.length === 0" class="text-center text-gray-500 py-8">
+            暂无成就，去和宠物互动吧！
           </div>
-        </div>
-      </div>
-
-      <!-- 成就展示区域 -->
-      <div class="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-lg">
-        <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">🏆 成就系统</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div 
-            v-for="achievement in achievements.slice(0, 9)" 
-            :key="achievement.id"
-            :class="[
-              'p-4 rounded-2xl border-2 transition-all duration-300',
-              achievement.unlocked 
-                ? 'bg-gradient-to-br from-yellow-100 to-orange-100 border-yellow-300' 
-                : 'bg-gray-50 border-gray-200'
-            ]"
-          >
-            <div class="text-center">
-              <div class="text-3xl mb-2">{{ achievement.emoji }}</div>
-              <div class="font-semibold text-gray-800">{{ achievement.name }}</div>
-              <div class="text-xs text-gray-600 mb-2">{{ achievement.description }}</div>
-              
-              <!-- 进度条 -->
-              <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
-                <div 
-                  :class="[
-                    'h-2 rounded-full transition-all duration-500',
-                    achievement.unlocked ? 'bg-yellow-400' : 'bg-blue-400'
-                  ]"
-                  :style="{ width: `${Math.min(100, achievement.progressPercentage)}%` }"
-                ></div>
-              </div>
-              
-              <div class="text-xs text-gray-600">
-                {{ achievement.progressDescription }}
-                <span v-if="achievement.unlocked" class="text-green-600 font-semibold ml-1">✓ 已完成</span>
-              </div>
-              
-              <!-- 奖励信息 -->
-              <div v-if="achievement.reward" class="text-xs text-gray-500 mt-1">
-                奖励: {{ achievement.reward.coins }}💰 {{ achievement.reward.experience }}⭐
+          
+          <div v-else class="space-y-4">
+            <div 
+              v-for="achievement in achievements" 
+              :key="achievement.achievementId"
+              class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg"
+            >
+              <div class="flex items-start justify-between">
+                <div class="flex-1">
+                  <h3 class="font-semibold text-lg">{{ achievement.achievementName }}</h3>
+                  <p class="text-gray-600 mt-1">{{ achievement.description }}</p>
+                  <div class="flex items-center mt-2 text-sm text-gray-500">
+                    <span>🏆 {{ achievement.points }} 积分</span>
+                    <span class="mx-2">•</span>
+                    <span>{{ formatDate(achievement.unlockedAt) }}</span>
+                  </div>
+                </div>
+                <div class="text-3xl">🏆</div>
               </div>
             </div>
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- 消息提示 -->
-      <div 
-        v-if="message" 
-        :class="[
-          'fixed top-20 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-2xl shadow-lg z-50 transition-all duration-500',
-          messageType === 'success' ? 'bg-green-500' : 'bg-red-500',
-          'text-white font-medium'
-        ]"
-      >
-        {{ message }}
+    <!-- 通知消息 -->
+    <div 
+      v-if="notification.show"
+      class="fixed top-4 right-4 z-50 transform transition-all duration-300"
+      :class="[
+        notification.show ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0',
+        notification.type === 'success' ? 'bg-green-500' : 
+        notification.type === 'error' ? 'bg-red-500' : 'bg-blue-500'
+      ]"
+    >
+      <div class="text-white p-4 rounded-lg shadow-lg max-w-sm">
+        <div class="flex items-center">
+          <span class="text-xl mr-3">
+            {{ notification.type === 'success' ? '✅' : 
+               notification.type === 'error' ? '❌' : 'ℹ️' }}
+          </span>
+          <div>
+            <div v-if="notification.title" class="font-semibold">{{ notification.title }}</div>
+            <div>{{ notification.message }}</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import axios from 'axios'
-
-// 类型定义
-interface PetType {
-  name: string
-  displayName: string
-  emoji: string
-  description: string
-}
-
-interface PetStats {
-  hunger: number
-  cleanliness: number
-  happiness: number
-  energy: number
-  health: number
-  experience: number
-  level: number
-}
-
-interface Pet {
-  id: string
-  name: string
-  type: PetType
-  stats: PetStats
-  color: string
-  birthDate: string
-  lastInteraction: string
-  asleep: boolean
-  mood: string
-  statusDescription: string
-  ageInDays: number
-}
-
-interface GameItem {
-  id: string
-  name: string
-  emoji: string
-  description: string
-  type: string
-  cost: number
-  rarity: number
-}
-
-interface PetAction {
-  name: string
-  displayName: string
-  emoji: string
-  description: string
-}
+import { ref, reactive, onMounted, computed } from 'vue'
+import PetRenderer from './PetRenderer.vue'
+import PetCustomizer from './PetCustomizer.vue'
+import MiniGamePlayer from './MiniGamePlayer.vue'
 
 // 响应式数据
-const apiBase = (import.meta as any).env.VITE_API_BASE || 'http://115.190.125.35/api'
-const playerId = ref('player1') // 简化版，实际项目中应该使用用户认证
-
-const pet = ref<Pet | null>(null)
-const petTypes = ref<PetType[]>([])
-const availableActions = ref<PetAction[]>([])
-const inventory = ref<GameItem[]>([])
-const shopItems = ref<GameItem[]>([])
-const coins = ref(0)
-
-// 小游戏和成就系统
-const activeGameSession = ref<any>(null)
-const gameTypes = ref<any[]>([])
+const loading = ref(true)
+const actionLoading = ref(false)
+const pets = ref<any[]>([])
+const currentPet = ref<any>(null)
+const inventory = ref<any[]>([])
 const achievements = ref<any[]>([])
-const currentSequence = ref<string[]>([])
-const memoryOptions = ref<string[]>(['🍎', '🍌', '🍇', '🍓', '🥝', '🍑', '🍊', '🥭', '🍍', '🥥'])
-const currentQuestion = ref<any>(null)
-const puzzleAnswer = ref('')
-const tapCount = ref(0)
-const timeRemaining = ref(0)
+const playerStats = ref<any>(null)
+const currentGame = ref<any>(null)
 
-const newPetName = ref('')
-const selectedPetType = ref('')
-const creating = ref(false)
-const executing = ref(false)
-const message = ref('')
-const messageType = ref<'success' | 'error'>('success')
+// UI状态
+const showCustomizer = ref(false)
+const showPetList = ref(false)
+const showAchievements = ref(false)
+const showSettings = ref(false)
+const showAchievementNotification = ref(false)
+const latestAchievement = ref<any>(null)
 
-const petAnimationClass = ref('')
-
-// 计算属性
-const petAge = computed(() => pet.value?.ageInDays || 0)
-
-const displayStats = computed(() => {
-  if (!pet.value) return {}
-  
-  const stats = pet.value.stats
-  return {
-    hunger: {
-      name: '饱食度',
-      emoji: '🍽️',
-      value: stats.hunger,
-      color: stats.hunger > 70 ? 'bg-green-400' : stats.hunger > 30 ? 'bg-yellow-400' : 'bg-red-400'
-    },
-    cleanliness: {
-      name: '清洁度',
-      emoji: '🛁',
-      value: stats.cleanliness,
-      color: stats.cleanliness > 70 ? 'bg-blue-400' : stats.cleanliness > 30 ? 'bg-yellow-400' : 'bg-red-400'
-    },
-    happiness: {
-      name: '快乐度',
-      emoji: '😊',
-      value: stats.happiness,
-      color: stats.happiness > 70 ? 'bg-pink-400' : stats.happiness > 30 ? 'bg-yellow-400' : 'bg-gray-400'
-    },
-    energy: {
-      name: '能量值',
-      emoji: '⚡',
-      value: stats.energy,
-      color: stats.energy > 70 ? 'bg-purple-400' : stats.energy > 30 ? 'bg-yellow-400' : 'bg-red-400'
-    },
-    health: {
-      name: '健康值',
-      emoji: '❤️',
-      value: stats.health,
-      color: stats.health > 70 ? 'bg-red-400' : stats.health > 30 ? 'bg-yellow-400' : 'bg-gray-400'
-    }
-  }
+// 通知系统
+const notification = reactive({
+  show: false,
+  type: 'info' as 'success' | 'error' | 'info',
+  title: '',
+  message: ''
 })
 
-// 方法
-async function loadPetTypes() {
-  try {
-    const response = await axios.get(`${apiBase}/pet/types`)
-    petTypes.value = response.data.data
-  } catch (error) {
-    showMessage('加载宠物类型失败', 'error')
-  }
-}
+const playerId = 'player1' // 简化版，实际项目中应该从用户系统获取
 
-async function loadPetInfo() {
-  try {
-    const response = await axios.get(`${apiBase}/pet/${playerId.value}`)
-    if (response.data.success) {
-      const data = response.data.data
-      
-      // 处理宠物数据，确保type包含完整信息
-      if (data.pet) {
-        // 如果type是字符串，转换为完整对象
-        if (typeof data.pet.type === 'string') {
-          const typeMap: {[key: string]: any} = {
-            'CAT': { name: 'CAT', displayName: '小猫咪', emoji: '🐱', description: '可爱的小猫，喜欢独立但也需要关爱' },
-            'DOG': { name: 'DOG', displayName: '小狗狗', emoji: '🐶', description: '忠诚的伙伴，活泼好动，需要更多的关注' },
-            'RABBIT': { name: 'RABBIT', displayName: '小兔子', emoji: '🐰', description: '温顺的小兔，喜欢安静的环境' },
-            'HAMSTER': { name: 'HAMSTER', displayName: '小仓鼠', emoji: '🐹', description: '活泼的小仓鼠，喜欢储存食物' },
-            'DRAGON': { name: 'DRAGON', displayName: '小龙', emoji: '🐲', description: '神秘的小龙，成长潜力巨大' },
-            'PANDA': { name: 'PANDA', displayName: '小熊猫', emoji: '🐼', description: '憨憨的小熊猫，喜欢吃竹子' },
-            'PENGUIN': { name: 'PENGUIN', displayName: '小企鹅', emoji: '🐧', description: '可爱的小企鹅，喜欢凉爽的环境' }
-          }
-          data.pet.type = typeMap[data.pet.type] || typeMap['CAT']
-        }
-        pet.value = data.pet
-      }
-      
-      coins.value = data.coins
-      
-      // 处理动作数据，确保包含displayName和emoji
-      if (Array.isArray(data.availableActions)) {
-        if (data.availableActions.length > 0 && typeof data.availableActions[0] === 'string') {
-          // 如果是字符串数组，转换为完整对象
-          const actionMap: {[key: string]: any} = {
-            'FEED': { name: 'FEED', displayName: '喂食', emoji: '🍽️', description: '给宠物喂食，增加饱食度' },
-            'CLEAN': { name: 'CLEAN', displayName: '清洁', emoji: '🛁', description: '给宠物洗澡，增加清洁度' },
-            'PLAY': { name: 'PLAY', displayName: '玩耍', emoji: '🎾', description: '和宠物玩耍，增加快乐度但消耗能量' },
-            'SLEEP': { name: 'SLEEP', displayName: '休息', emoji: '💤', description: '让宠物休息，恢复能量' },
-            'PET': { name: 'PET', displayName: '抚摸', emoji: '✋', description: '轻柔地抚摸宠物，增加快乐度' },
-            'TALK': { name: 'TALK', displayName: '聊天', emoji: '💬', description: '和宠物说话，增加快乐度' },
-            'MEDICINE': { name: 'MEDICINE', displayName: '治疗', emoji: '💊', description: '给生病的宠物治疗' },
-            'EXERCISE': { name: 'EXERCISE', displayName: '运动', emoji: '🏃', description: '带宠物运动，增加健康度' },
-            'FEED_TREAT': { name: 'FEED_TREAT', displayName: '给零食', emoji: '🍪', description: '给宠物特殊零食，大幅增加快乐度' },
-            'FEED_MEDICINE': { name: 'FEED_MEDICINE', displayName: '喂药', emoji: '💉', description: '给宠物喂药，恢复健康' }
-          }
-          availableActions.value = data.availableActions.map((actionName: string) => 
-            actionMap[actionName] || { name: actionName, displayName: actionName, emoji: '❓', description: '未知动作' }
-          )
-        } else {
-          // 如果已经是对象数组，直接使用
-          availableActions.value = data.availableActions
-        }
-      }
-      
-      inventory.value = data.inventory
-    }
-  } catch (error: any) {
-    if (error.response?.status === 404) {
-      // 用户没有宠物，保持在创建界面
-      pet.value = null
-    } else {
-      showMessage('加载宠物信息失败', 'error')
-    }
-  }
-}
+// API基础URL
+const API_BASE = '/api/pets'
 
-async function loadShopItems() {
-  try {
-    const response = await axios.get(`${apiBase}/pet/shop`)
-    shopItems.value = response.data.data
-  } catch (error) {
-    showMessage('加载商店失败', 'error')
-  }
-}
-
-async function loadGameTypes() {
-  try {
-    const response = await axios.get(`${apiBase}/pet/minigame/types`)
-    const data = response.data.data
-    
-    // 处理游戏类型数据，确保包含完整信息
-    if (Array.isArray(data)) {
-      if (data.length > 0 && typeof data[0] === 'string') {
-        // 如果是字符串数组，转换为完整对象
-        const gameTypeMap: {[key: string]: any} = {
-          'MEMORY': { name: 'MEMORY', displayName: '记忆游戏', emoji: '🧠', description: '记住序列并重复', difficulty: 3, maxReward: 15 },
-          'REACTION': { name: 'REACTION', displayName: '反应游戏', emoji: '⚡', description: '快速点击出现的目标', difficulty: 2, maxReward: 10 },
-          'PUZZLE': { name: 'PUZZLE', displayName: '猜谜游戏', emoji: '🧩', description: '回答简单的问题', difficulty: 4, maxReward: 20 },
-          'TAP': { name: 'TAP', displayName: '拍拍游戏', emoji: '👆', description: '连续点击宠物获得分数', difficulty: 1, maxReward: 8 }
-        }
-        gameTypes.value = data.map((gameTypeName: string) => 
-          gameTypeMap[gameTypeName] || { name: gameTypeName, displayName: gameTypeName, emoji: '🎮', description: '未知游戏' }
-        )
-      } else {
-        // 如果已经是对象数组，直接使用
-        gameTypes.value = data
-      }
-    }
-  } catch (error) {
-    showMessage('加载游戏类型失败', 'error')
-  }
-}
-
-async function loadAchievements() {
-  try {
-    const response = await axios.get(`${apiBase}/pet/${playerId.value}/achievements`)
-    achievements.value = response.data.data
-  } catch (error) {
-    showMessage('加载成就失败', 'error')
-  }
-}
-
-async function checkActiveGameSession() {
-  try {
-    const response = await axios.get(`${apiBase}/pet/${playerId.value}/minigame/active`)
-    if (response.data.success) {
-      activeGameSession.value = response.data.data
-      processGameSessionData()
-    }
-  } catch (error: any) {
-    if (error.response?.status !== 404) {
-      console.log('没有活跃的游戏会话')
-    }
-  }
-}
-
-async function createPet() {
-  if (!newPetName.value.trim() || !selectedPetType.value) return
+// 工具函数
+const showNotification = (type: 'success' | 'error' | 'info', message: string, title?: string) => {
+  notification.type = type
+  notification.message = message
+  notification.title = title || ''
+  notification.show = true
   
-  creating.value = true
-  try {
-    const response = await axios.post(`${apiBase}/pet/create`, {
-      playerId: playerId.value,
-      petName: newPetName.value.trim(),
-      petType: selectedPetType.value
-    })
-    
-    if (response.data.success) {
-      showMessage('宠物创建成功！', 'success')
-      await loadPetInfo()
-    } else {
-      showMessage(response.data.message, 'error')
-    }
-  } catch (error: any) {
-    showMessage(error.response?.data?.message || '创建宠物失败', 'error')
-  } finally {
-    creating.value = false
-  }
-}
-
-async function executeAction(actionName: string) {
-  if (executing.value) return
-  
-  executing.value = true
-  try {
-    const response = await axios.post(`${apiBase}/pet/${playerId.value}/action`, {
-      action: actionName
-    })
-    
-    if (response.data.success) {
-      showMessage(response.data.message, 'success')
-      pet.value = response.data.data
-      animatePet()
-      // 重新加载完整信息
-      await loadPetInfo()
-    } else {
-      showMessage(response.data.message, 'error')
-    }
-  } catch (error: any) {
-    showMessage(error.response?.data?.message || '执行动作失败', 'error')
-  } finally {
-    executing.value = false
-  }
-}
-
-async function useItem(itemId: string) {
-  if (executing.value) return
-  
-  executing.value = true
-  try {
-    const response = await axios.post(`${apiBase}/pet/${playerId.value}/use-item`, {
-      itemId: itemId
-    })
-    
-    if (response.data.success) {
-      showMessage(response.data.message, 'success')
-      pet.value = response.data.data
-      animatePet()
-      await loadPetInfo()
-    } else {
-      showMessage(response.data.message, 'error')
-    }
-  } catch (error: any) {
-    showMessage(error.response?.data?.message || '使用物品失败', 'error')
-  } finally {
-    executing.value = false
-  }
-}
-
-async function buyItem(itemId: string) {
-  if (executing.value) return
-  
-  executing.value = true
-  try {
-    const response = await axios.post(`${apiBase}/pet/${playerId.value}/buy-item`, {
-      itemId: itemId
-    })
-    
-    if (response.data.success) {
-      showMessage(response.data.message, 'success')
-      await loadPetInfo()
-    } else {
-      showMessage(response.data.message, 'error')
-    }
-  } catch (error: any) {
-    showMessage(error.response?.data?.message || '购买失败', 'error')
-  } finally {
-    executing.value = false
-  }
-}
-
-function petPet() {
-  animatePet()
-  executeAction('PET')
-}
-
-function animatePet() {
-  petAnimationClass.value = 'transform scale-110'
   setTimeout(() => {
-    petAnimationClass.value = ''
-  }, 300)
-}
-
-async function resetGame() {
-  if (confirm('确定要重新开始吗？这将删除当前宠物！')) {
-    try {
-      // 发送删除宠物的请求（如果API支持）
-      await axios.delete(`${apiBase}/pet/${playerId.value}`).catch(() => {
-        // 忽略删除错误，可能API不支持
-      })
-      
-      // 重置本地状态
-      pet.value = null
-      coins.value = 0
-      availableActions.value = []
-      inventory.value = []
-      activeGameSession.value = null
-      achievements.value = []
-      
-      showMessage('已重置游戏，请重新选择宠物！', 'success')
-    } catch (error) {
-      showMessage('重置失败，请刷新页面', 'error')
-    }
-  }
-}
-
-function showMessage(msg: string, type: 'success' | 'error' = 'success') {
-  message.value = msg
-  messageType.value = type
-  setTimeout(() => {
-    message.value = ''
+    notification.show = false
   }, 3000)
 }
 
-// 小游戏相关方法
-async function startMiniGame(gameTypeName: string) {
-  if (executing.value) return
-  
-  executing.value = true
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleDateString('zh-CN')
+}
+
+// API调用函数
+const apiCall = async (url: string, options: RequestInit = {}) => {
   try {
-    const response = await axios.post(`${apiBase}/pet/${playerId.value}/minigame/start`, {
-      gameType: gameTypeName
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+      },
+      ...options
     })
     
-    if (response.data.success) {
-      activeGameSession.value = response.data.data
-      processGameSessionData()
-      showMessage(response.data.message, 'success')
-    } else {
-      showMessage(response.data.message, 'error')
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
-  } catch (error: any) {
-    showMessage(error.response?.data?.message || '开始游戏失败', 'error')
-  } finally {
-    executing.value = false
+    
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error('API call failed:', error)
+    throw error
   }
 }
 
-function processGameSessionData() {
-  if (!activeGameSession.value) return
-  
-  const gameData = activeGameSession.value.gameData
-  
-  switch (activeGameSession.value.gameType.name) {
-    case 'MEMORY':
-      currentSequence.value = gameData.sequence || []
-      break
-    case 'PUZZLE':
-      currentQuestion.value = gameData.question
-      puzzleAnswer.value = ''
-      break
-    case 'TAP':
-      tapCount.value = gameData.taps || 0
-      updateTapTimer()
-      break
-  }
-}
-
-async function selectMemoryItem(emoji: string) {
-  if (!activeGameSession.value || executing.value) return
-  
-  executing.value = true
+// 加载数据
+const loadPlayerPets = async () => {
   try {
-    const response = await axios.post(`${apiBase}/pet/minigame/${activeGameSession.value.sessionId}/input`, {
-      selection: emoji
-    })
+    const response = await apiCall(`${API_BASE}/player/${playerId}`)
+    pets.value = response.data || []
     
-    handleGameResponse(response)
-  } catch (error: any) {
-    showMessage(error.response?.data?.message || '游戏输入失败', 'error')
-  } finally {
-    executing.value = false
-  }
-}
-
-async function submitPuzzleAnswer() {
-  if (!activeGameSession.value || !puzzleAnswer.value.trim() || executing.value) return
-  
-  executing.value = true
-  try {
-    const response = await axios.post(`${apiBase}/pet/minigame/${activeGameSession.value.sessionId}/input`, {
-      answer: puzzleAnswer.value.trim()
-    })
-    
-    handleGameResponse(response)
-  } catch (error: any) {
-    showMessage(error.response?.data?.message || '提交答案失败', 'error')
-  } finally {
-    executing.value = false
-  }
-}
-
-async function tapPet() {
-  if (!activeGameSession.value || executing.value) return
-  
-  executing.value = true
-  try {
-    const response = await axios.post(`${apiBase}/pet/minigame/${activeGameSession.value.sessionId}/input`, {
-      tap: true
-    })
-    
-    tapCount.value++
-    handleGameResponse(response)
-  } catch (error: any) {
-    showMessage(error.response?.data?.message || '拍击失败', 'error')
-  } finally {
-    executing.value = false
-  }
-}
-
-function handleGameResponse(response: any) {
-  if (response.data.success) {
-    activeGameSession.value = response.data.data
-    showMessage(response.data.message, 'success')
-    
-    // 检查游戏是否结束
-    if (activeGameSession.value.state === 'GAME_COMPLETE' || activeGameSession.value.state === 'FAILED') {
-      setTimeout(async () => {
-        activeGameSession.value = null
-        await Promise.all([loadPetInfo(), loadAchievements()])
-      }, 2000)
-    } else {
-      processGameSessionData()
+    if (pets.value.length > 0 && !currentPet.value) {
+      currentPet.value = pets.value[0]
     }
+  } catch (error) {
+    console.error('加载宠物失败:', error)
+  }
+}
+
+const loadPlayerInventory = async () => {
+  try {
+    const response = await apiCall(`${API_BASE}/player/${playerId}/inventory`)
+    inventory.value = response.data || []
+  } catch (error) {
+    console.error('加载背包失败:', error)
+  }
+}
+
+const loadPlayerAchievements = async () => {
+  try {
+    const response = await apiCall(`${API_BASE}/player/${playerId}/achievements`)
+    achievements.value = response.data || []
+  } catch (error) {
+    console.error('加载成就失败:', error)
+  }
+}
+
+const loadPlayerStats = async () => {
+  try {
+    const response = await apiCall(`${API_BASE}/player/${playerId}/stats`)
+    playerStats.value = response.data
+  } catch (error) {
+    console.error('加载统计失败:', error)
+  }
+}
+
+const updateCurrentPet = async () => {
+  if (!currentPet.value) return
+  
+  try {
+    const response = await apiCall(`${API_BASE}/${currentPet.value.petId}`)
+    if (response.success) {
+      currentPet.value = response.data
+      
+      // 更新pets数组中的对应宠物
+      const index = pets.value.findIndex(p => p.petId === currentPet.value.petId)
+      if (index !== -1) {
+        pets.value[index] = currentPet.value
+      }
+    }
+  } catch (error) {
+    console.error('更新宠物状态失败:', error)
+  }
+}
+
+// 宠物操作
+const feedPet = async () => {
+  if (!currentPet.value || actionLoading.value) return
+  
+  // 查找食物
+  const food = inventory.value.find(item => 
+    item.itemId === 'BASIC_FOOD' && item.quantity > 0
+  )
+  
+  if (!food) {
+    showNotification('error', '没有食物了！')
+    return
+  }
+  
+  actionLoading.value = true
+  try {
+    const response = await apiCall(`${API_BASE}/${currentPet.value.petId}/feed`, {
+      method: 'POST',
+      body: JSON.stringify({ itemId: 'BASIC_FOOD' })
+    })
+    
+    if (response.success) {
+      currentPet.value = response.data
+      showNotification('success', '喂食成功！宠物很开心~')
+      await loadPlayerInventory()
+    } else {
+      showNotification('error', response.message)
+    }
+  } catch (error) {
+    showNotification('error', '喂食失败')
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+const cleanPet = async () => {
+  if (!currentPet.value || actionLoading.value) return
+  
+  actionLoading.value = true
+  try {
+    const response = await apiCall(`${API_BASE}/${currentPet.value.petId}/clean`, {
+      method: 'POST'
+    })
+    
+    if (response.success) {
+      currentPet.value = response.data
+      showNotification('success', '清洁完成！宠物变得干净了~')
+    } else {
+      showNotification('error', response.message)
+    }
+  } catch (error) {
+    showNotification('error', '清洁失败')
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+const restPet = async () => {
+  if (!currentPet.value || actionLoading.value) return
+  
+  actionLoading.value = true
+  try {
+    const response = await apiCall(`${API_BASE}/${currentPet.value.petId}/rest`, {
+      method: 'POST'
+    })
+    
+    if (response.success) {
+      currentPet.value = response.data
+      showNotification('success', '休息完成！宠物恢复了体力~')
+    } else {
+      showNotification('error', response.message)
+    }
+  } catch (error) {
+    showNotification('error', '休息失败')
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+const playWithPet = async (activityType: string) => {
+  if (!currentPet.value || actionLoading.value) return
+  
+  actionLoading.value = true
+  try {
+    const response = await apiCall(`${API_BASE}/${currentPet.value.petId}/play`, {
+      method: 'POST',
+      body: JSON.stringify({ activityType })
+    })
+    
+    if (response.success) {
+      currentPet.value = response.data
+      const activityNames: Record<string, string> = {
+        'FETCH': '抛接游戏',
+        'PUZZLE': '益智游戏',
+        'CUDDLE': '拥抱',
+        'EXERCISE': '运动训练'
+      }
+      showNotification('success', `${activityNames[activityType]}完成！宠物很开心~`)
+      
+      // 检查是否有新成就
+      await checkNewAchievements()
+    } else {
+      showNotification('error', response.message)
+    }
+  } catch (error) {
+    showNotification('error', '玩耍失败')
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+const useItem = async (itemId: string) => {
+  if (itemId === 'BASIC_FOOD') {
+    await feedPet()
   } else {
-    showMessage(response.data.message, 'error')
+    showNotification('info', '该物品暂无特殊用途')
   }
 }
 
-function updateTapTimer() {
-  if (!activeGameSession.value) return
+// 小游戏
+const startMiniGame = async (gameType: string) => {
+  if (!currentPet.value || actionLoading.value || currentGame.value) return
   
-  const gameData = activeGameSession.value.gameData
-  const startTime = gameData.startTime
-  const timeLimit = gameData.timeLimit
-  
-  const updateInterval = setInterval(() => {
-    const elapsed = (Date.now() - startTime) / 1000
-    timeRemaining.value = Math.max(0, timeLimit - Math.floor(elapsed))
+  actionLoading.value = true
+  try {
+    const response = await apiCall(`${API_BASE}/${currentPet.value.petId}/minigames/start`, {
+      method: 'POST',
+      body: JSON.stringify({ gameType })
+    })
     
-    if (timeRemaining.value <= 0 || !activeGameSession.value) {
-      clearInterval(updateInterval)
+    if (response.success) {
+      currentGame.value = response.data
+      showNotification('success', '游戏开始！')
+    } else {
+      showNotification('error', response.message)
     }
-  }, 100)
+  } catch (error) {
+    showNotification('error', '启动游戏失败')
+  } finally {
+    actionLoading.value = false
+  }
 }
 
-// 生命周期
+const handleGameComplete = async (gameType: string, score: number) => {
+  if (!currentPet.value) return
+  
+  try {
+    const response = await apiCall(`${API_BASE}/${currentPet.value.petId}/minigames/complete`, {
+      method: 'POST',
+      body: JSON.stringify({ gameType, score })
+    })
+    
+    if (response.success) {
+      currentPet.value = response.data
+      currentGame.value = null
+      showNotification('success', `游戏完成！得分：${score}`)
+      
+      // 检查是否有新成就
+      await checkNewAchievements()
+    } else {
+      showNotification('error', response.message)
+    }
+  } catch (error) {
+    showNotification('error', '完成游戏失败')
+  }
+}
+
+// 宠物管理
+const selectPet = (pet: any) => {
+  currentPet.value = pet
+  showPetList.value = false
+}
+
+const handlePetCreated = async (petData: any) => {
+  try {
+    const response = await apiCall(`${API_BASE}/create`, {
+      method: 'POST',
+      body: JSON.stringify(petData)
+    })
+    
+    if (response.success) {
+      showCustomizer.value = false
+      showNotification('success', '宠物创建成功！', '欢迎新伙伴!')
+      await loadPlayerPets()
+      await loadPlayerInventory()
+      await loadPlayerStats()
+    } else {
+      showNotification('error', response.message)
+    }
+  } catch (error) {
+    showNotification('error', '创建宠物失败')
+  }
+}
+
+const handlePetClick = () => {
+  if (currentPet.value.stats.energy > 10) {
+    playWithPet('CUDDLE')
+  } else {
+    showNotification('info', '宠物太累了，让它休息一下吧~')
+  }
+}
+
+// 成就检查
+const checkNewAchievements = async () => {
+  const oldAchievements = [...achievements.value]
+  await loadPlayerAchievements()
+  
+  // 查找新解锁的成就
+  const newAchievements = achievements.value.filter(newAch => 
+    !oldAchievements.some(oldAch => oldAch.achievementId === newAch.achievementId)
+  )
+  
+  if (newAchievements.length > 0) {
+    latestAchievement.value = newAchievements[0]
+    showAchievementNotification.value = true
+    
+    setTimeout(() => {
+      showAchievementNotification.value = false
+    }, 5000)
+    
+    await loadPlayerStats()
+  }
+}
+
+// 初始化
 onMounted(async () => {
-  await Promise.all([
-    loadPetTypes(),
-    loadPetInfo(),
-    loadShopItems(),
-    loadGameTypes(),
-    loadAchievements(),
-    checkActiveGameSession()
-  ])
+  try {
+    await Promise.all([
+      loadPlayerPets(),
+      loadPlayerInventory(),
+      loadPlayerAchievements(),
+      loadPlayerStats()
+    ])
+  } catch (error) {
+    console.error('初始化失败:', error)
+  } finally {
+    loading.value = false
+  }
+  
+  // 定期更新宠物状态
+  setInterval(updateCurrentPet, 30000) // 每30秒更新一次
 })
 </script>
 
 <style scoped>
-/* 添加一些自定义样式 */
-.bg-pink-25 {
-  background-color: rgb(253, 242, 248);
+/* 自定义滚动条样式 */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* 动画效果 */
+@keyframes bounce {
+  0%, 20%, 53%, 80%, 100% {
+    transform: translate3d(0,0,0);
+  }
+  40%, 43% {
+    transform: translate3d(0,-15px,0);
+  }
+  70% {
+    transform: translate3d(0,-7px,0);
+  }
+  90% {
+    transform: translate3d(0,-2px,0);
+  }
+}
+
+.bounce {
+  animation: bounce 1s ease-in-out;
+}
+
+/* 渐变背景动画 */
+@keyframes gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.bg-gradient-animated {
+  background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+  background-size: 400% 400%;
+  animation: gradient 15s ease infinite;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .grid-cols-1.lg\\:grid-cols-3 {
+    grid-template-columns: 1fr;
+  }
+  
+  .grid-cols-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .fixed.bottom-4 {
+    bottom: 1rem;
+    left: 1rem;
+    right: 1rem;
+  }
 }
 </style>
