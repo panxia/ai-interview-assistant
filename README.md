@@ -82,10 +82,7 @@
 ### 🔧 本地开发
 
 #### 1. 克隆项目
-```bash
-git clone https://github.com/panpan/pet-park.git
-cd pet-park
-```
+
 
 > **作者：panpan** 🧑‍💻 感谢您对宠物公园项目的关注！
 
@@ -104,7 +101,7 @@ npm run dev
 ```
 
 #### 4. 访问游戏
-打开浏览器访问 [http://localhost:5173](http://localhost:5173)
+打开浏览器访问 [http://http://115.190.125.35/](http://115.190.125.35/)
 
 
 
