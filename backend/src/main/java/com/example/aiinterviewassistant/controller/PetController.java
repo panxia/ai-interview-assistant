@@ -6,6 +6,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -349,6 +350,71 @@ public class PetController {
     }
 
     /**
+     * 更新宠物外观
+     */
+    @PostMapping("/{playerId}/appearance")
+    public ResponseEntity<ApiResponse<Pet>> updatePetAppearance(
+            @PathVariable String playerId, 
+            @RequestBody PetAppearance appearance) {
+        try {
+            Pet pet = petService.updatePetAppearance(playerId, appearance);
+            if (pet == null) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok(ApiResponse.success("外观更新成功！", pet));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("外观更新失败：" + e.getMessage()));
+        }
+    }
+
+    /**
+     * 获取宠物外观配置选项
+     */
+    @GetMapping("/appearance/options")
+    public ResponseEntity<ApiResponse<PetService.AppearanceOptions>> getAppearanceOptions() {
+        try {
+            PetService.AppearanceOptions options = petService.getAppearanceOptions();
+            return ResponseEntity.ok(ApiResponse.success("获取外观选项成功", options));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("获取外观选项失败：" + e.getMessage()));
+        }
+    }
+
+    /**
+     * 更新宠物性格
+     */
+    @PostMapping("/{playerId}/personality")
+    public ResponseEntity<ApiResponse<Pet>> updatePetPersonality(
+            @PathVariable String playerId, 
+            @RequestBody PetPersonality personality) {
+        try {
+            Pet pet = petService.updatePetPersonality(playerId, personality);
+            if (pet == null) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok(ApiResponse.success("性格更新成功！", pet));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("性格更新失败：" + e.getMessage()));
+        }
+    }
+
+    /**
+     * 获取宠物推荐活动
+     */
+    @GetMapping("/{playerId}/recommendations")
+    public ResponseEntity<ApiResponse<List<PetService.ActivityRecommendation>>> getActivityRecommendations(
+            @PathVariable String playerId) {
+        try {
+            List<PetService.ActivityRecommendation> recommendations = petService.getActivityRecommendations(playerId);
+            return ResponseEntity.ok(ApiResponse.success("获取推荐成功", recommendations));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("获取推荐失败：" + e.getMessage()));
+        }
+    }
+
+    // 新增的请求响应类使用Service中的类型别名
+
+    /**
      * 统一API响应格式
      */
     public static class ApiResponse<T> {
@@ -378,5 +444,112 @@ public class PetController {
         public boolean isSuccess() { return success; }
         public String getMessage() { return message; }
         public T getData() { return data; }
+    }
+
+    // 环境系统相关接口
+
+    /**
+     * 获取当前天气状态
+     */
+    @GetMapping("/{playerId}/weather")
+    public ResponseEntity<ApiResponse<Environment.WeatherState>> getCurrentWeather(@PathVariable String playerId) {
+        Environment.WeatherState weather = petService.getCurrentWeather(playerId);
+        return ResponseEntity.ok(ApiResponse.success("获取天气成功", weather));
+    }
+
+    /**
+     * 获取所有房间配置
+     */
+    @GetMapping("/{playerId}/rooms")
+    public ResponseEntity<ApiResponse<Map<Environment.RoomType, Environment.RoomConfiguration>>> getRooms(@PathVariable String playerId) {
+        Map<Environment.RoomType, Environment.RoomConfiguration> rooms = petService.getRooms(playerId);
+        return ResponseEntity.ok(ApiResponse.success("获取房间配置成功", rooms));
+    }
+
+    /**
+     * 获取可用装饰物品
+     */
+    @GetMapping("/{playerId}/decorations")
+    public ResponseEntity<ApiResponse<List<Environment.DecorationItem>>> getAvailableDecorations(@PathVariable String playerId) {
+        List<Environment.DecorationItem> decorations = petService.getAvailableDecorations(playerId);
+        return ResponseEntity.ok(ApiResponse.success("获取装饰物品成功", decorations));
+    }
+
+    /**
+     * 在房间中放置装饰物品
+     */
+    @PostMapping("/{playerId}/rooms/{roomType}/place")
+    public ResponseEntity<ApiResponse<String>> placeDecoration(
+            @PathVariable String playerId,
+            @PathVariable Environment.RoomType roomType,
+            @RequestBody PlaceDecorationRequest request) {
+        boolean success = petService.placeDecoration(playerId, request.getItemId(), roomType, request.getX(), request.getY());
+        if (success) {
+            return ResponseEntity.ok(ApiResponse.success("装饰物品放置成功", "success"));
+        } else {
+            return ResponseEntity.badRequest()
+                .body(ApiResponse.error("装饰物品放置失败"));
+        }
+    }
+
+    /**
+     * 移除房间中的装饰物品
+     */
+    @DeleteMapping("/{playerId}/rooms/{roomType}/items/{itemId}")
+    public ResponseEntity<ApiResponse<String>> removeDecoration(
+            @PathVariable String playerId,
+            @PathVariable Environment.RoomType roomType,
+            @PathVariable String itemId) {
+        boolean success = petService.removeDecoration(playerId, roomType, itemId);
+        if (success) {
+            return ResponseEntity.ok(ApiResponse.success("装饰物品移除成功", "success"));
+        } else {
+            return ResponseEntity.badRequest()
+                .body(ApiResponse.error("装饰物品移除失败"));
+        }
+    }
+
+    /**
+     * 切换宠物到指定房间
+     */
+    @PostMapping("/{playerId}/rooms/{roomType}/enter")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> switchRoom(
+            @PathVariable String playerId,
+            @PathVariable Environment.RoomType roomType) {
+        petService.switchRoom(playerId, roomType);
+        Map<String, Double> roomEffects = petService.getRoomEffects(playerId, roomType);
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("roomType", roomType);
+        result.put("effects", roomEffects);
+        
+        return ResponseEntity.ok(ApiResponse.success("房间切换成功", result));
+    }
+
+    /**
+     * 获取房间的环境效果
+     */
+    @GetMapping("/{playerId}/rooms/{roomType}/effects")
+    public ResponseEntity<ApiResponse<Map<String, Double>>> getRoomEffects(
+            @PathVariable String playerId,
+            @PathVariable Environment.RoomType roomType) {
+        Map<String, Double> effects = petService.getRoomEffects(playerId, roomType);
+        return ResponseEntity.ok(ApiResponse.success("获取房间效果成功", effects));
+    }
+
+    /**
+     * 放置装饰物品请求类
+     */
+    public static class PlaceDecorationRequest {
+        private String itemId;
+        private double x;
+        private double y;
+
+        public String getItemId() { return itemId; }
+        public void setItemId(String itemId) { this.itemId = itemId; }
+        public double getX() { return x; }
+        public void setX(double x) { this.x = x; }
+        public double getY() { return y; }
+        public void setY(double y) { this.y = y; }
     }
 }

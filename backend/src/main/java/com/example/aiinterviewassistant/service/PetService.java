@@ -23,6 +23,9 @@ public class PetService {
     
     // 小游戏和成就系统
     private final Map<String, MiniGame.GameSession> activeSessions = new ConcurrentHashMap<>();
+    
+    // 环境管理器
+    private final Map<String, Environment.EnvironmentManager> playerEnvironments = new ConcurrentHashMap<>();
     private final Map<String, List<Achievement>> playerAchievements = new ConcurrentHashMap<>();
     private final Map<String, Map<String, Integer>> playerStats = new ConcurrentHashMap<>();
     
@@ -409,28 +412,93 @@ public class PetService {
 
         // 初始化游戏数据
         switch (gameType) {
+            // 智力游戏类
             case MEMORY -> {
                 session.setState(MiniGame.GameState.PLAYING);
-                List<String> sequence = MiniGame.MemoryGameGenerator.generateSequence(3);
-                session.putGameData("sequence", sequence);
+                Map<String, Object> sequenceData = MiniGame.MemoryGameGenerator.generateSequence(3, session.getCurrentRound());
+                session.putGameData("sequenceData", sequenceData);
                 session.putGameData("playerSequence", new ArrayList<String>());
+                session.putGameData("showPhase", true);
             }
+            case PUZZLE -> {
+                session.setState(MiniGame.GameState.PLAYING);
+                Map<String, Object> puzzleData = MiniGame.PuzzleGameGenerator.generatePuzzle(session.getCurrentRound() + 1);
+                session.putGameData("puzzleData", puzzleData);
+                session.putGameData("completedPieces", 0);
+            }
+            case SPOT_DIFFERENCE -> {
+                session.setState(MiniGame.GameState.PLAYING);
+                session.putGameData("differences", generateSpotDifferences());
+                session.putGameData("foundDifferences", new ArrayList<>());
+                session.putGameData("timeLimit", 60000); // 60秒
+            }
+            
+            // 反应游戏类
             case REACTION -> {
                 session.setState(MiniGame.GameState.PLAYING);
-                Map<String, Object> targets = MiniGame.ReactionGameGenerator.generateTargets(5);
+                Map<String, Object> targets = MiniGame.SuperReactionGameGenerator.generateTargets(5, session.getCurrentRound());
                 session.putGameData("targets", targets);
                 session.putGameData("correctClicks", 0);
                 session.putGameData("totalClicks", 0);
+                session.putGameData("startTime", System.currentTimeMillis());
             }
-            case PUZZLE -> {
+            case PRECISION_SHOOTING -> {
+                session.setState(MiniGame.GameState.PLAYING);
+                Map<String, Object> levelData = MiniGame.PrecisionShootingGenerator.generateLevel(session.getCurrentRound());
+                session.putGameData("levelData", levelData);
+                session.putGameData("shots", new ArrayList<>());
+                session.putGameData("ammunition", levelData.get("ammunition"));
+            }
+            case WHACK_MOLE -> {
+                session.setState(MiniGame.GameState.PLAYING);
+                session.putGameData("moles", generateWhackMoles());
+                session.putGameData("hits", 0);
+                session.putGameData("misses", 0);
+                session.putGameData("timeLimit", 30000); // 30秒
+            }
+            
+            // 节奏游戏类
+            case MUSIC_DANCE -> {
+                session.setState(MiniGame.GameState.PLAYING);
+                Map<String, Object> danceData = MiniGame.MusicDanceGenerator.generateDanceSequence("default_song", 120);
+                session.putGameData("danceData", danceData);
+                session.putGameData("perfectHits", 0);
+                session.putGameData("goodHits", 0);
+                session.putGameData("missedHits", 0);
+            }
+            case DRUM_GAME -> {
+                session.setState(MiniGame.GameState.PLAYING);
+                session.putGameData("drumPattern", generateDrumPattern());
+                session.putGameData("playerInputs", new ArrayList<>());
+                session.putGameData("accuracy", 0.0);
+            }
+            case SINGING_CONTEST -> {
                 session.setState(MiniGame.GameState.WAITING_INPUT);
-                MiniGame.PuzzleQuestion question = MiniGame.PuzzleGameGenerator.getRandomQuestion();
-                session.putGameData("question", question);
+                session.putGameData("song", selectRandomSong());
+                session.putGameData("pitchAccuracy", new ArrayList<>());
+                session.putGameData("rhythmAccuracy", new ArrayList<>());
             }
+            
+            // 创意游戏类
+            case PET_CARE_CHALLENGE -> {
+                session.setState(MiniGame.GameState.PLAYING);
+                session.putGameData("challenges", generateCareChallenge());
+                session.putGameData("completedTasks", 0);
+                session.putGameData("timeLimit", 120000); // 2分钟
+            }
+            case TREASURE_HUNT -> {
+                session.setState(MiniGame.GameState.PLAYING);
+                session.putGameData("treasureMap", generateTreasureMap());
+                session.putGameData("cluesFound", new ArrayList<>());
+                session.putGameData("treasuresFound", 0);
+            }
+            
+            // 经典游戏升级版
             case TAP -> {
                 session.setState(MiniGame.GameState.PLAYING);
                 session.putGameData("taps", 0);
-                session.putGameData("timeLimit", 10); // 10秒限时
+                session.putGameData("comboMultiplier", 1);
+                session.putGameData("timeLimit", 15000); // 15秒限时
                 session.putGameData("startTime", System.currentTimeMillis());
             }
         }
@@ -467,7 +535,9 @@ public class PetService {
 
     private MiniGame.GameResult processMemoryGameInput(MiniGame.GameSession session, Map<String, Object> input) {
         @SuppressWarnings("unchecked")
-        List<String> sequence = (List<String>) session.getGameData("sequence");
+        Map<String, Object> sequenceData = (Map<String, Object>) session.getGameData("sequenceData");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sequence = (List<Map<String, Object>>) sequenceData.get("sequence");
         @SuppressWarnings("unchecked")
         List<String> playerSequence = (List<String>) session.getGameData("playerSequence");
         
@@ -477,22 +547,27 @@ public class PetService {
         if (playerSequence.size() <= sequence.size()) {
             // 检查到目前为止是否正确
             for (int i = 0; i < playerSequence.size(); i++) {
-                if (!sequence.get(i).equals(playerSequence.get(i))) {
-                    return finishGame(session, false, "记忆错误！正确答案是：" + String.join(" ", sequence));
+                String correctEmoji = (String) sequence.get(i).get("emoji");
+                if (!correctEmoji.equals(playerSequence.get(i))) {
+                    List<String> correctSequence = sequence.stream()
+                        .map(item -> (String) item.get("emoji"))
+                        .toList();
+                    return finishGame(session, false, "记忆错误！正确答案是：" + String.join(" ", correctSequence));
                 }
             }
 
             if (playerSequence.size() == sequence.size()) {
                 // 完成一轮
                 session.addScore(10 * sequence.size());
+                session.addCombo(); // 增加连击
                 session.setCurrentRound(session.getCurrentRound() + 1);
                 
                 if (session.getCurrentRound() >= session.getMaxRounds()) {
                     return finishGame(session, true, "恭喜！记忆游戏完成！");
                 } else {
                     // 下一轮，序列更长
-                    List<String> newSequence = MiniGame.MemoryGameGenerator.generateSequence(sequence.size() + 1);
-                    session.putGameData("sequence", newSequence);
+                    Map<String, Object> newSequenceData = MiniGame.MemoryGameGenerator.generateSequence(sequence.size() + 1, session.getCurrentRound());
+                    session.putGameData("sequenceData", newSequenceData);
                     session.putGameData("playerSequence", new ArrayList<String>());
                     return new MiniGame.GameResult(true, "进入下一轮！", session);
                 }
@@ -545,7 +620,7 @@ public class PetService {
                 return finishGame(session, true, "恭喜！猜谜游戏完成！");
             } else {
                 // 下一题
-                MiniGame.PuzzleQuestion newQuestion = MiniGame.PuzzleGameGenerator.getRandomQuestion();
+                MiniGame.PuzzleQuestion newQuestion = MiniGame.PuzzleQuestionGenerator.getRandomQuestion();
                 session.putGameData("question", newQuestion);
                 return new MiniGame.GameResult(true, "回答正确！下一题...", session);
             }
@@ -743,5 +818,451 @@ public class PetService {
         public boolean isSuccess() { return success; }
         public String getMessage() { return message; }
         public Pet getPet() { return pet; }
+    }
+
+    // ================= 宠物外观自定义系统 =================
+
+    /**
+     * 更新宠物外观
+     */
+    public Pet updatePetAppearance(String playerId, PetAppearance appearance) {
+        Pet pet = pets.get(playerId);
+        if (pet == null) {
+            return null;
+        }
+        
+        pet.setAppearance(appearance);
+        pet.updateLastInteraction();
+        
+        // 更新成就
+        updateAchievement(playerId, Achievement.AchievementType.CUSTOMIZATION, 1);
+        
+        return pet;
+    }
+
+    /**
+     * 更新宠物性格
+     */
+    public Pet updatePetPersonality(String playerId, PetPersonality personality) {
+        Pet pet = pets.get(playerId);
+        if (pet == null) {
+            return null;
+        }
+        
+        pet.setPersonality(personality);
+        pet.updateLastInteraction();
+        
+        return pet;
+    }
+
+    /**
+     * 获取外观配置选项
+     */
+    public AppearanceOptions getAppearanceOptions() {
+        return new AppearanceOptions();
+    }
+
+    /**
+     * 获取活动推荐
+     */
+    public List<ActivityRecommendation> getActivityRecommendations(String playerId) {
+        Pet pet = pets.get(playerId);
+        if (pet == null) {
+            return new ArrayList<>();
+        }
+
+        List<ActivityRecommendation> recommendations = new ArrayList<>();
+        PetPersonality personality = pet.getPersonality();
+
+        // 基于性格推荐活动
+        recommendations.add(new ActivityRecommendation(
+            "puzzle_game", "智力游戏", "挑战智力，获得经验", 
+            personality.getActivitySuitability("puzzle_game"), "🧩"
+        ));
+        
+        recommendations.add(new ActivityRecommendation(
+            "reaction_game", "反应游戏", "测试反应速度", 
+            personality.getActivitySuitability("reaction_game"), "⚡"
+        ));
+        
+        recommendations.add(new ActivityRecommendation(
+            "rhythm_game", "节奏游戏", "跟随音乐节拍", 
+            personality.getActivitySuitability("rhythm_game"), "🎵"
+        ));
+        
+        recommendations.add(new ActivityRecommendation(
+            "exploration", "探索活动", "发现新事物", 
+            personality.getActivitySuitability("exploration"), "🔍"
+        ));
+        
+        recommendations.add(new ActivityRecommendation(
+            "grooming", "美容护理", "保持清洁美丽", 
+            personality.getActivitySuitability("grooming"), "🛁"
+        ));
+
+        // 按适合度排序
+        recommendations.sort((a, b) -> Double.compare(b.getSuitability(), a.getSuitability()));
+        
+        return recommendations;
+    }
+
+    // 新增的内部类
+    public static class AppearanceOptions {
+        private List<String> headShapes;
+        private List<String> earTypes;
+        private List<String> eyeTypes;
+        private List<String> mouthTypes;
+        private List<String> patternTypes;
+        private List<String> accessoryTypes;
+        private List<String> colorPalette;
+
+        public AppearanceOptions() {
+            this.headShapes = List.of("round", "oval", "square", "triangular");
+            this.earTypes = List.of("pointed", "round", "floppy", "long", "horn", "none");
+            this.eyeTypes = List.of("large", "small", "sleepy", "mysterious", "friendly");
+            this.mouthTypes = List.of("small", "open", "tiny", "wise", "content", "beak");
+            this.patternTypes = List.of("none", "stripes", "spots", "gradient", "heart", "scales");
+            this.accessoryTypes = List.of("none", "baseball_cap", "beret", "crown", "bow_tie", "bell");
+            this.colorPalette = List.of("#FF8C00", "#8B4513", "#FFFFFF", "#F4A460", "#9932CC", "#000000", 
+                                      "#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF", "#00FFFF");
+        }
+
+        // Getters
+        public List<String> getHeadShapes() { return headShapes; }
+        public List<String> getEarTypes() { return earTypes; }
+        public List<String> getEyeTypes() { return eyeTypes; }
+        public List<String> getMouthTypes() { return mouthTypes; }
+        public List<String> getPatternTypes() { return patternTypes; }
+        public List<String> getAccessoryTypes() { return accessoryTypes; }
+        public List<String> getColorPalette() { return colorPalette; }
+    }
+
+    public static class ActivityRecommendation {
+        private String activityType;
+        private String displayName;
+        private String description;
+        private double suitability;
+        private String icon;
+
+        public ActivityRecommendation(String activityType, String displayName, String description, 
+                                    double suitability, String icon) {
+            this.activityType = activityType;
+            this.displayName = displayName;
+            this.description = description;
+            this.suitability = suitability;
+            this.icon = icon;
+        }
+
+        // Getters
+        public String getActivityType() { return activityType; }
+        public String getDisplayName() { return displayName; }
+        public String getDescription() { return description; }
+        public double getSuitability() { return suitability; }
+        public String getIcon() { return icon; }
+    }
+
+    // 新游戏类型的辅助方法
+
+    /**
+     * 生成找茬游戏的差异点
+     */
+    private List<Map<String, Object>> generateSpotDifferences() {
+        List<Map<String, Object>> differences = new ArrayList<>();
+        Random random = new Random();
+        
+        // 生成5个差异点
+        for (int i = 0; i < 5; i++) {
+            Map<String, Object> diff = new HashMap<>();
+            diff.put("id", i);
+            diff.put("x", random.nextInt(250) + 25); // 在250x250区域内
+            diff.put("y", random.nextInt(250) + 25);
+            diff.put("size", random.nextInt(20) + 10); // 10-30像素大小
+            diff.put("type", random.nextBoolean() ? "missing" : "different"); // 缺失或不同
+            differences.add(diff);
+        }
+        
+        return differences;
+    }
+
+    /**
+     * 生成打地鼠游戏的地鼠
+     */
+    private List<Map<String, Object>> generateWhackMoles() {
+        List<Map<String, Object>> moles = new ArrayList<>();
+        Random random = new Random();
+        
+        // 生成9个洞穴位置 (3x3网格)
+        for (int i = 0; i < 9; i++) {
+            Map<String, Object> mole = new HashMap<>();
+            mole.put("id", i);
+            mole.put("x", (i % 3) * 100 + 50);
+            mole.put("y", (i / 3) * 100 + 50);
+            mole.put("isActive", false);
+            mole.put("type", "normal"); // normal, golden, trap
+            mole.put("timeLeft", 0);
+            moles.add(mole);
+        }
+        
+        return moles;
+    }
+
+    /**
+     * 生成鼓点模式
+     */
+    private Map<String, Object> generateDrumPattern() {
+        Map<String, Object> pattern = new HashMap<>();
+        List<Map<String, Object>> beats = new ArrayList<>();
+        Random random = new Random();
+        
+        // 生成16拍的鼓点模式
+        for (int i = 0; i < 16; i++) {
+            if (random.nextDouble() < 0.6) { // 60%的概率有鼓点
+                Map<String, Object> beat = new HashMap<>();
+                beat.put("time", i * 500); // 每500ms一拍
+                beat.put("drum", random.nextBoolean() ? "kick" : "snare");
+                beat.put("intensity", random.nextDouble() * 0.5 + 0.5); // 0.5-1.0强度
+                beats.add(beat);
+            }
+        }
+        
+        pattern.put("beats", beats);
+        pattern.put("bpm", 120);
+        pattern.put("duration", 8000); // 8秒
+        
+        return pattern;
+    }
+
+    /**
+     * 选择随机歌曲
+     */
+    private Map<String, Object> selectRandomSong() {
+        String[] songs = {
+            "happy_song", "relaxing_melody", "energetic_tune", "gentle_lullaby"
+        };
+        String[] songNames = {
+            "快乐小歌", "轻松旋律", "活力曲调", "温柔摇篮曲"
+        };
+        
+        Random random = new Random();
+        int index = random.nextInt(songs.length);
+        
+        Map<String, Object> song = new HashMap<>();
+        song.put("id", songs[index]);
+        song.put("name", songNames[index]);
+        song.put("duration", 30000); // 30秒
+        song.put("difficulty", random.nextInt(3) + 1); // 1-3难度
+        
+        return song;
+    }
+
+    /**
+     * 生成护理挑战任务
+     */
+    private List<Map<String, Object>> generateCareChallenge() {
+        List<Map<String, Object>> challenges = new ArrayList<>();
+        String[] tasks = {
+            "喂食", "清洁", "玩耍", "治疗", "梳毛"
+        };
+        String[] descriptions = {
+            "给宠物喂食恢复饥饿度", "帮宠物洗澡提升清洁度", 
+            "和宠物玩耍增加快乐度", "使用药品恢复健康值", "梳理毛发让宠物更美丽"
+        };
+        
+        Random random = new Random();
+        
+        // 生成3-5个随机任务
+        int taskCount = random.nextInt(3) + 3;
+        for (int i = 0; i < taskCount; i++) {
+            int taskIndex = random.nextInt(tasks.length);
+            Map<String, Object> challenge = new HashMap<>();
+            challenge.put("id", i);
+            challenge.put("task", tasks[taskIndex]);
+            challenge.put("description", descriptions[taskIndex]);
+            challenge.put("targetValue", random.nextInt(20) + 80); // 目标值80-100
+            challenge.put("completed", false);
+            challenge.put("timeLimit", 30); // 30秒完成
+            challenges.add(challenge);
+        }
+        
+        return challenges;
+    }
+
+    /**
+     * 生成寻宝地图
+     */
+    private Map<String, Object> generateTreasureMap() {
+        Map<String, Object> treasureMap = new HashMap<>();
+        List<Map<String, Object>> treasures = new ArrayList<>();
+        List<Map<String, Object>> clues = new ArrayList<>();
+        Random random = new Random();
+        
+        // 生成3个宝藏位置
+        String[] rooms = {"living_room", "bedroom", "kitchen", "bathroom", "garden"};
+        String[] locations = {"沙发下", "床底下", "冰箱后", "浴缸旁", "花丛中"};
+        
+        for (int i = 0; i < 3; i++) {
+            int roomIndex = random.nextInt(rooms.length);
+            Map<String, Object> treasure = new HashMap<>();
+            treasure.put("id", i);
+            treasure.put("room", rooms[roomIndex]);
+            treasure.put("location", locations[roomIndex]);
+            treasure.put("x", random.nextInt(200) + 50);
+            treasure.put("y", random.nextInt(200) + 50);
+            treasure.put("value", (i + 1) * 10); // 10, 20, 30金币
+            treasures.add(treasure);
+            
+            // 为每个宝藏生成线索
+            Map<String, Object> clue = new HashMap<>();
+            clue.put("id", i);
+            clue.put("text", "在" + locations[roomIndex] + "寻找闪亮的宝藏");
+            clue.put("treasureId", i);
+            clue.put("difficulty", random.nextInt(3) + 1);
+            clues.add(clue);
+        }
+        
+        treasureMap.put("treasures", treasures);
+        treasureMap.put("clues", clues);
+        treasureMap.put("totalValue", 60); // 总价值60金币
+        
+        return treasureMap;
+    }
+
+    // 环境系统相关方法
+
+    /**
+     * 获取玩家的环境管理器
+     */
+    private Environment.EnvironmentManager getEnvironmentManager(String playerId) {
+        return playerEnvironments.computeIfAbsent(playerId, k -> new Environment.EnvironmentManager());
+    }
+
+    /**
+     * 获取当前天气状态
+     */
+    public Environment.WeatherState getCurrentWeather(String playerId) {
+        Environment.EnvironmentManager envManager = getEnvironmentManager(playerId);
+        envManager.updateWeather(); // 更新天气
+        return envManager.getWeatherState();
+    }
+
+    /**
+     * 获取所有房间配置
+     */
+    public Map<Environment.RoomType, Environment.RoomConfiguration> getRooms(String playerId) {
+        Environment.EnvironmentManager envManager = getEnvironmentManager(playerId);
+        return envManager.getRooms();
+    }
+
+    /**
+     * 获取可用装饰物品
+     */
+    public List<Environment.DecorationItem> getAvailableDecorations(String playerId) {
+        Environment.EnvironmentManager envManager = getEnvironmentManager(playerId);
+        return envManager.getAvailableDecorations();
+    }
+
+    /**
+     * 在房间中放置装饰物品
+     */
+    public boolean placeDecoration(String playerId, String itemId, Environment.RoomType roomType, double x, double y) {
+        Environment.EnvironmentManager envManager = getEnvironmentManager(playerId);
+        
+        // 查找装饰物品
+        Environment.DecorationItem item = envManager.getAvailableDecorations().stream()
+            .filter(decoration -> decoration.getId().equals(itemId))
+            .findFirst()
+            .orElse(null);
+            
+        if (item == null || !item.isUnlocked()) {
+            return false;
+        }
+
+        // 检查玩家是否有足够金币
+        Pet pet = getPet(playerId);
+        if (pet == null || pet.getStats().getCoins() < item.getCost()) {
+            return false;
+        }
+
+        // 扣除金币
+        pet.getStats().setCoins(pet.getStats().getCoins() - item.getCost());
+
+        // 放置物品
+        Environment.RoomConfiguration room = envManager.getRooms().get(roomType);
+        if (room != null) {
+            Environment.PlacedItem placedItem = new Environment.PlacedItem(item, x, y);
+            room.getPlacedItems().add(placedItem);
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * 移除房间中的装饰物品
+     */
+    public boolean removeDecoration(String playerId, Environment.RoomType roomType, String placedItemId) {
+        Environment.EnvironmentManager envManager = getEnvironmentManager(playerId);
+        Environment.RoomConfiguration room = envManager.getRooms().get(roomType);
+        
+        if (room != null) {
+            return room.getPlacedItems().removeIf(item -> item.getItemId().equals(placedItemId));
+        }
+        
+        return false;
+    }
+
+    /**
+     * 切换宠物到指定房间
+     */
+    public void switchRoom(String playerId, Environment.RoomType roomType) {
+        Pet pet = getPet(playerId);
+        if (pet != null) {
+            pet.setCurrentRoom(roomType);
+            
+            // 应用房间环境效果
+            Environment.EnvironmentManager envManager = getEnvironmentManager(playerId);
+            Map<String, Double> roomEffects = envManager.calculateRoomEffects(roomType);
+            applyEnvironmentEffects(pet, roomEffects);
+        }
+    }
+
+    /**
+     * 应用环境效果到宠物
+     */
+    private void applyEnvironmentEffects(Pet pet, Map<String, Double> effects) {
+        PetStats stats = pet.getStats();
+        
+        // 应用乘数效果
+        if (effects.containsKey("activity_multiplier")) {
+            // 活动度影响能量消耗
+            double multiplier = effects.get("activity_multiplier");
+            if (multiplier > 1.0) {
+                stats.setEnergy(Math.max(0, stats.getEnergy() - (int)((multiplier - 1.0) * 5)));
+            }
+        }
+        
+        if (effects.containsKey("comfort")) {
+            // 舒适度提升快乐度
+            double comfort = effects.get("comfort");
+            stats.setHappiness(Math.min(100, stats.getHappiness() + (int)(comfort * 10)));
+        }
+        
+        if (effects.containsKey("energy_recovery")) {
+            // 能量恢复加成
+            double recovery = effects.get("energy_recovery");
+            if (pet.isAsleep()) {
+                stats.setEnergy(Math.min(100, stats.getEnergy() + (int)(recovery * 15)));
+            }
+        }
+        
+        // 其他环境效果可以在这里添加
+    }
+
+    /**
+     * 获取房间的环境效果
+     */
+    public Map<String, Double> getRoomEffects(String playerId, Environment.RoomType roomType) {
+        Environment.EnvironmentManager envManager = getEnvironmentManager(playerId);
+        return envManager.calculateRoomEffects(roomType);
     }
 }

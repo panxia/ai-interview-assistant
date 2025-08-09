@@ -28,6 +28,9 @@ public class PetStats {
     // 等级
     private int level = 1;
     
+    // 金币
+    private int coins = 100; // 初始金币
+    
     // 最后更新时间（用于计算随时间的状态变化）
     private LocalDateTime lastUpdate = LocalDateTime.now();
 
@@ -108,6 +111,9 @@ public class PetStats {
 
     public int getLevel() { return level; }
     public void setLevel(int level) { this.level = level; }
+
+    public int getCoins() { return coins; }
+    public void setCoins(int coins) { this.coins = Math.max(0, coins); }
 
     public LocalDateTime getLastUpdate() { return lastUpdate; }
     public void setLastUpdate(LocalDateTime lastUpdate) { this.lastUpdate = lastUpdate; }
