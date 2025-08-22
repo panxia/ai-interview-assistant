@@ -7,7 +7,7 @@ export default defineConfig({
     port: 80,
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: process.env.VITE_API_BASE || 'http://pet.bwmiao.com',
         changeOrigin: true
       }
     }

@@ -6,6 +6,5 @@ spring:
     name: pet-park
 
 app:
-  allowedOrigins: ${ALLOWED_ORIGINS:http://localhost:80}
-
+  allowedOrigins: ${ALLOWED_ORIGINS:http://localhost:80,http://pet.bwmiao.com}
 # 豆包API配置已移除，项目现为纯宠物养成游戏

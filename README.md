@@ -101,9 +101,71 @@ npm run dev
 ```
 
 #### 4. 访问游戏
-打开浏览器访问 [http://http://115.190.125.35/](http://115.190.125.35/)
+打开浏览器访问 [http://pet.bwmiao.com](http://pet.bwmiao.com)
 
+## 🌐 域名配置
 
+### 生产环境域名访问
+
+项目已配置支持域名 `pet.bwmiao.com` 访问：
+
+1. **HTTP访问**: http://pet.bwmiao.com
+2. **HTTPS访问**: https://pet.bwmiao.com (需要SSL证书)
+
+### 域名配置步骤
+
+1. **更新Nginx配置**
+```bash
+# 使用提供的部署脚本
+sudo chmod +x deploy-domain.sh
+sudo ./deploy-domain.sh
+```
+
+2. **手动配置（可选）**
+```bash
+# 复制配置文件
+sudo cp deploy/nginx-main.conf /etc/nginx/nginx.conf
+# 测试配置
+sudo nginx -t
+# 重启服务
+sudo systemctl restart nginx
+```
+
+3. **SSL证书配置（推荐）**
+```bash
+# 将SSL证书文件放置到
+/etc/nginx/ssl/pet.bwmiao.com.crt
+/etc/nginx/ssl/pet.bwmiao.com.key
+# 然后使用HTTPS配置
+sudo cp deploy/nginx-https.conf /etc/nginx/nginx.conf
+```
+
+4. **前端配置更新**
+```bash
+# 构建生产环境前端
+./build-frontend.sh production
+
+# 或者手动构建
+cd frontend
+cp env.production .env
+npm run build
+```
+
+5. **部署前端文件**
+```bash
+# 将构建的前端文件复制到Nginx目录
+sudo cp -r frontend/dist/* /usr/share/nginx/html/
+```
+
+### DNS配置要求
+
+确保您的域名 `pet.bwmiao.com` 已正确解析到服务器IP地址：
+```bash
+# 检查域名解析
+nslookup pet.bwmiao.com
+# 或
+dig pet.bwmiao.com
+```
 
 ## 🎯 游戏玩法
 
@@ -211,61 +273,4 @@ sudo cp -r frontend/dist/* /usr/share/nginx/html/
 ```
 
 3. **启动后端**
-```bash
-cd backend
-mvn clean package
-java -jar target/*.jar
 ```
-
-### 性能优化建议
-
-- 使用Redis缓存宠物状态数据
-- 实现数据库存储替代内存存储
-- 添加CDN加速静态资源
-- 使用Nginx配置静态资源缓存
-
-## 🤝 贡献指南
-
-我们欢迎社区贡献！请按照以下步骤：
-
-1. Fork 项目
-2. 创建功能分支 (`git checkout -b feature/amazing-feature`)
-3. 提交更改 (`git commit -m 'Add amazing feature'`)
-4. 推送到分支 (`git push origin feature/amazing-feature`)
-5. 创建 Pull Request
-
-### 开发规范
-- 遵循Java代码规范
-- 使用TypeScript进行前端开发
-- 编写清晰的提交信息
-- 添加必要的测试用例
-
-## 📝 更新日志
-
-### v1.0.0 (2025-01-XX)
-- 🎉 宠物公园正式开园！
-- ✨ 支持7种可爱宠物入园
-- 🎮 4种趣味小游戏
-- 🏆 完整的成就系统
-- 🛍️ 丰富的宠物用品商店
-- 👨‍💻 由panpan精心打造
-
-## 📄 许可证
-
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
-
-## 🙏 致谢
-
-感谢所有为宠物公园项目做出贡献的开发者和玩家们！
-特别感谢每一位愿意体验这个温馨小游戏的用户。
-
-## 📞 联系方式
-
-- 项目主页: [GitHub Repository](https://github.com/panpan/pet-park)
-- 问题反馈: [Issue Tracker](https://github.com/panpan/pet-park/issues)
-- 作者: panpan
-- 邮箱: panpan@example.com
-
----
-
-🏞️ **欢迎来到宠物公园，开始您的温馨养成之旅！** 🏞️
