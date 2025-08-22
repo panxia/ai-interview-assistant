@@ -302,6 +302,24 @@ public class PetPersonality {
         applyPersonalityType(type);
     }
     
+    // 兼容方法
+    public int getLaziness() { return 100 - energy; } // 懒惰度与精力相反
+    public void setLaziness(int laziness) { this.energy = Math.max(0, Math.min(100, 100 - laziness)); }
+    
+    public PersonalityType getPersonalityType() { return type; }
+    public void setPersonalityType(PersonalityType type) { 
+        this.type = type; 
+        applyPersonalityType(type);
+    }
+    public void setPersonalityType(String type) {
+        try {
+            this.type = PersonalityType.valueOf(type.toUpperCase());
+            applyPersonalityType(this.type);
+        } catch (Exception e) {
+            this.type = PersonalityType.BALANCED;
+        }
+    }
+    
     public String getCustomDescription() { return customDescription; }
     public void setCustomDescription(String customDescription) { 
         this.customDescription = customDescription; 

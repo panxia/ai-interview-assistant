@@ -111,16 +111,17 @@ public class Pet {
                 appearance.setPrimaryColor("#DEB887");
                 personality.setType(PetPersonality.PersonalityType.CURIOUS);
             }
-            case BIRD -> {
-                appearance.setEarStyle(PetAppearance.EarStyle.NONE);
-                appearance.setPrimaryColor("#FFFF00");
-                personality.setType(PetPersonality.PersonalityType.PLAYFUL);
-            }
             case DRAGON -> {
                 appearance.setEarStyle(PetAppearance.EarStyle.POINTED);
                 appearance.setPrimaryColor("#800080");
                 appearance.setHasGlow(true);
                 personality.setType(PetPersonality.PersonalityType.BRAVE);
+            }
+            case PANDA -> {
+                appearance.setEarStyle(PetAppearance.EarStyle.ROUND);
+                appearance.setPrimaryColor("#000000");
+                appearance.setSecondaryColor("#FFFFFF");
+                personality.setType(PetPersonality.PersonalityType.LAZY);
             }
         }
     }
@@ -315,6 +316,24 @@ public class Pet {
     // Getters and Setters
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
+    
+    // 兼容性字段
+    public String getPetId() { return id; }
+    public void setPetId(String petId) { this.id = petId; }
+    
+    public String getPlayerId() { return "default"; } // 临时实现，应该从数据库获取
+    public void setPlayerId(String playerId) { 
+        // 临时实现，应该存储到数据库
+    }
+    
+    public String getPetName() { return name; }
+    public void setPetName(String petName) { this.name = petName; }
+    
+    public PetType getPetType() { return type; }
+    public void setPetType(PetType petType) { this.type = petType; }
+    
+    public LocalDateTime getCreatedAt() { return birthDate; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.birthDate = createdAt; }
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }

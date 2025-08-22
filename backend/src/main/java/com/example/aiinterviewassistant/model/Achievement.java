@@ -201,6 +201,25 @@ public class Achievement {
     // Getters and Setters
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
+    
+    // 兼容性字段
+    public String getAchievementId() { return id; }
+    public void setAchievementId(String achievementId) { this.id = achievementId; }
+    
+    public String getAchievementName() { return name; }
+    public void setAchievementName(String achievementName) { this.name = achievementName; }
+    
+    public LocalDateTime getUnlockedAt() { return unlockedDate; }
+    public void setUnlockedAt(LocalDateTime unlockedAt) { this.unlockedDate = unlockedAt; }
+    
+    public int getPoints() { return reward != null ? reward.getCoins() : 0; }
+    public void setPoints(int points) { 
+        if (reward == null) {
+            reward = new Reward(points, 0);
+        } else {
+            reward.setCoins(points);
+        }
+    }
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }

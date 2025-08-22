@@ -295,15 +295,43 @@ public class PetAppearance {
     // Getters and Setters
     public HeadShape getHeadShape() { return headShape; }
     public void setHeadShape(HeadShape headShape) { this.headShape = headShape; }
+    public void setHeadShape(String headShape) {
+        try {
+            this.headShape = HeadShape.valueOf(headShape.toUpperCase());
+        } catch (Exception e) {
+            this.headShape = HeadShape.ROUND;
+        }
+    }
     
     public EarStyle getEarStyle() { return earStyle; }
     public void setEarStyle(EarStyle earStyle) { this.earStyle = earStyle; }
+    public void setEarStyle(String earStyle) {
+        try {
+            this.earStyle = EarStyle.valueOf(earStyle.toUpperCase());
+        } catch (Exception e) {
+            this.earStyle = EarStyle.POINTED;
+        }
+    }
     
     public EyeType getEyeType() { return eyeType; }
     public void setEyeType(EyeType eyeType) { this.eyeType = eyeType; }
+    public void setEyeType(String eyeType) {
+        try {
+            this.eyeType = EyeType.valueOf(eyeType.toUpperCase());
+        } catch (Exception e) {
+            this.eyeType = EyeType.NORMAL;
+        }
+    }
     
     public MouthExpression getMouthExpression() { return mouthExpression; }
     public void setMouthExpression(MouthExpression mouthExpression) { this.mouthExpression = mouthExpression; }
+    public void setMouthExpression(String mouthExpression) {
+        try {
+            this.mouthExpression = MouthExpression.valueOf(mouthExpression.toUpperCase());
+        } catch (Exception e) {
+            this.mouthExpression = MouthExpression.SMILE;
+        }
+    }
     
     public BodyProportion getBodyProportion() { return bodyProportion; }
     public void setBodyProportion(BodyProportion bodyProportion) { this.bodyProportion = bodyProportion; }
@@ -325,6 +353,13 @@ public class PetAppearance {
     
     public Pattern getPattern() { return pattern; }
     public void setPattern(Pattern pattern) { this.pattern = pattern; }
+    public void setPattern(String pattern) {
+        try {
+            this.pattern = Pattern.valueOf(pattern.toUpperCase());
+        } catch (Exception e) {
+            this.pattern = Pattern.NONE;
+        }
+    }
     
     public String getPatternColor() { return patternColor; }
     public void setPatternColor(String patternColor) { this.patternColor = patternColor; }
@@ -334,12 +369,33 @@ public class PetAppearance {
     
     public Accessory getHat() { return hat; }
     public void setHat(Accessory hat) { this.hat = hat; }
+    public void setHat(String hat) {
+        try {
+            this.hat = Accessory.valueOf(hat.toUpperCase());
+        } catch (Exception e) {
+            this.hat = Accessory.NONE;
+        }
+    }
     
     public Accessory getCollar() { return collar; }
     public void setCollar(Accessory collar) { this.collar = collar; }
+    public void setCollar(String collar) {
+        try {
+            this.collar = Accessory.valueOf(collar.toUpperCase());
+        } catch (Exception e) {
+            this.collar = Accessory.NONE;
+        }
+    }
     
     public Accessory getGlasses() { return glasses; }
     public void setGlasses(Accessory glasses) { this.glasses = glasses; }
+    public void setGlasses(String glasses) {
+        try {
+            this.glasses = Accessory.valueOf(glasses.toUpperCase());
+        } catch (Exception e) {
+            this.glasses = Accessory.NONE;
+        }
+    }
     
     public Map<String, Accessory> getCustomAccessories() { return customAccessories; }
     public void setCustomAccessories(Map<String, Accessory> customAccessories) { 
@@ -354,4 +410,35 @@ public class PetAppearance {
     
     public boolean isHasSparkles() { return hasSparkles; }
     public void setHasSparkles(boolean hasSparkles) { this.hasSparkles = hasSparkles; }
+    
+    // BodyProportion 代理方法
+    public void setBodyProportionFatness(Double fatness) {
+        if (bodyProportion != null && fatness != null) {
+            bodyProportion.setFatness(fatness.floatValue());
+        }
+    }
+    
+    public void setBodyProportionHeight(Double height) {
+        if (bodyProportion != null && height != null) {
+            bodyProportion.setHeight(height.floatValue());
+        }
+    }
+    
+    public void setBodyProportionHeadSize(Double headSize) {
+        if (bodyProportion != null && headSize != null) {
+            bodyProportion.setHeadSize(headSize.floatValue());
+        }
+    }
+    
+    public void setBodyProportionLimbLength(Double limbLength) {
+        if (bodyProportion != null && limbLength != null) {
+            bodyProportion.setLimbLength(limbLength.floatValue());
+        }
+    }
+    
+    public void setBodyProportionTailLength(Double tailLength) {
+        if (bodyProportion != null && tailLength != null) {
+            bodyProportion.setTailLength(tailLength.floatValue());
+        }
+    }
 }

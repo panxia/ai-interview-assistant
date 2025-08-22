@@ -130,7 +130,7 @@ public class PetService {
         personality.setPersonalityType(personalityType != null ? personalityType : "PLAYFUL");
         
         switch (personality.getPersonalityType()) {
-            case "PLAYFUL":
+            case PLAYFUL:
                 personality.setPlayfulness(90);
                 personality.setLaziness(20);
                 personality.setCuriosity(80);
@@ -138,7 +138,7 @@ public class PetService {
                 personality.setIndependence(30);
                 personality.setIntelligence(60);
                 break;
-            case "LAZY":
+            case LAZY:
                 personality.setPlayfulness(20);
                 personality.setLaziness(90);
                 personality.setCuriosity(40);
@@ -146,7 +146,7 @@ public class PetService {
                 personality.setIndependence(70);
                 personality.setIntelligence(50);
                 break;
-            case "CURIOUS":
+            case CURIOUS:
                 personality.setPlayfulness(70);
                 personality.setLaziness(30);
                 personality.setCuriosity(95);
@@ -154,7 +154,7 @@ public class PetService {
                 personality.setIndependence(60);
                 personality.setIntelligence(85);
                 break;
-            case "AFFECTIONATE":
+            case AFFECTIONATE:
                 personality.setPlayfulness(60);
                 personality.setLaziness(40);
                 personality.setCuriosity(50);
@@ -162,7 +162,7 @@ public class PetService {
                 personality.setIndependence(20);
                 personality.setIntelligence(65);
                 break;
-            case "INDEPENDENT":
+            case INDEPENDENT:
                 personality.setPlayfulness(50);
                 personality.setLaziness(60);
                 personality.setCuriosity(70);
@@ -170,7 +170,7 @@ public class PetService {
                 personality.setIndependence(90);
                 personality.setIntelligence(75);
                 break;
-            case "INTELLIGENT":
+            case INTELLIGENT:
                 personality.setPlayfulness(60);
                 personality.setLaziness(40);
                 personality.setCuriosity(85);
@@ -213,7 +213,7 @@ public class PetService {
         item.setDescription(description);
         item.setQuantity(quantity);
         item.setItemType("CONSUMABLE");
-        item.setRarity("COMMON");
+        item.setRarity(1); // COMMON对应稀有度1
         return item;
     }
     
