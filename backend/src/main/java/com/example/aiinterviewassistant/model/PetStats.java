@@ -28,6 +28,12 @@ public class PetStats {
     // 等级
     private int level = 1;
     
+    // 扩展属性
+    private int intelligence = 50;
+    private int strength = 50;
+    private int agility = 50;
+    private int loyalty = 50;
+    
     // 最后更新时间（用于计算随时间的状态变化）
     private LocalDateTime lastUpdate = LocalDateTime.now();
 
@@ -111,4 +117,17 @@ public class PetStats {
 
     public LocalDateTime getLastUpdate() { return lastUpdate; }
     public void setLastUpdate(LocalDateTime lastUpdate) { this.lastUpdate = lastUpdate; }
+    
+    // 扩展属性的getter和setter
+    public int getIntelligence() { return intelligence; }
+    public void setIntelligence(int intelligence) { this.intelligence = Math.max(0, Math.min(100, intelligence)); }
+    
+    public int getStrength() { return strength; }
+    public void setStrength(int strength) { this.strength = Math.max(0, Math.min(100, strength)); }
+    
+    public int getAgility() { return agility; }
+    public void setAgility(int agility) { this.agility = Math.max(0, Math.min(100, agility)); }
+    
+    public int getLoyalty() { return loyalty; }
+    public void setLoyalty(int loyalty) { this.loyalty = Math.max(0, Math.min(100, loyalty)); }
 }

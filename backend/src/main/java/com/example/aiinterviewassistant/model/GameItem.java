@@ -12,6 +12,7 @@ public class GameItem {
     private ItemType type;
     private int cost; // 购买成本（游戏币）
     private int rarity; // 稀有度 1-5
+    private int quantity = 1; // 数量
     private PetAction.StatEffect effect; // 物品效果
     private boolean isUnlocked; // 是否已解锁
 
@@ -189,6 +190,22 @@ public class GameItem {
     // Getters and Setters
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
+    
+    // 兼容性字段
+    public String getItemId() { return id; }
+    public void setItemId(String itemId) { this.id = itemId; }
+    
+    public String getItemName() { return name; }
+    public void setItemName(String itemName) { this.name = itemName; }
+    
+    public String getItemType() { return type != null ? type.name() : ""; }
+    public void setItemType(String itemType) { 
+        try {
+            this.type = ItemType.valueOf(itemType.toUpperCase());
+        } catch (Exception e) {
+            this.type = ItemType.TOY; // 默认值
+        }
+    }
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
@@ -213,4 +230,7 @@ public class GameItem {
 
     public boolean isUnlocked() { return isUnlocked; }
     public void setUnlocked(boolean unlocked) { isUnlocked = unlocked; }
+    
+    public int getQuantity() { return quantity; }
+    public void setQuantity(int quantity) { this.quantity = Math.max(0, quantity); }
 }
