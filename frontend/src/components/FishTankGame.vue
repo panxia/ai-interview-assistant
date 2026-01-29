@@ -1,516 +1,383 @@
 <template>
-  <div class="fish-tank-game">
-    <div class="game-controls">
-      <button @click="clearCanvas" class="control-btn">清空画布</button>
-      <button @click="addRandomFish" class="control-btn">添加随机鱼</button>
-      <button @click="toggleAnimation" class="control-btn">
-        {{ isAnimating ? '停止动画' : '开始动画' }}
-      </button>
-      <div class="color-picker">
-        <label>鱼的颜色:</label>
-        <input type="color" v-model="fishColor" />
-      </div>
-      <div class="size-slider">
-        <label>鱼的大小: {{ fishSize }}</label>
-        <input type="range" v-model="fishSize" min="10" max="50" />
+  <div class="max-w-6xl mx-auto p-4">
+    <!-- 游戏标题区域 -->
+    <div class="text-center mb-6">
+      <h2 class="text-3xl font-bold text-gray-800 mb-2">🐠 手动画鱼鱼缸游戏 🐠</h2>
+      <p class="text-gray-600">在画布上画鱼，观看鱼在鱼缸里游泳！</p>
+    </div>
+
+    <!-- 游戏控制面板 -->
+    <div class="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+        <!-- 颜色选择器 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">鱼的颜色</label>
+          <div class="flex items-center space-x-2">
+            <input 
+              v-model="currentColor" 
+              type="color" 
+              class="w-10 h-10 border-0 rounded cursor-pointer"
+            />
+            <span class="text-sm">{{ currentColor }}</span>
+          </div>
+        </div>
+
+        <!-- 大小滑块 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            鱼的大小: {{ currentSize }}
+          </label>
+          <input 
+            v-model="currentSize" 
+            type="range" 
+            min="10" 
+            max="50" 
+            class="w-full"
+          />
+        </div>
+
+        <!-- 控制按钮 -->
+        <div class="flex flex-wrap gap-2">
+          <button 
+            @click="clearCanvas"
+            class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+          >
+            清空画布
+          </button>
+          <button 
+            @click="addRandomFish"
+            class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+          >
+            添加随机鱼
+          </button>
+          <button 
+            @click="toggleAnimation"
+            class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            {{ isAnimating ? '停止动画' : '开始动画' }}
+          </button>
+        </div>
       </div>
     </div>
-    
-    <div class="fish-tank-container">
-      <canvas
-        ref="canvas"
-        @mousedown="startDrawing"
-        @mousemove="draw"
-        @mouseup="stopDrawing"
-        @mouseleave="stopDrawing"
-        class="fish-tank-canvas"
-      ></canvas>
-      
-      <div class="fish-tank-decoration">
-        <div class="bubble bubble-1"></div>
-        <div class="bubble bubble-2"></div>
-        <div class="bubble bubble-3"></div>
-        <div class="bubble bubble-4"></div>
-        <div class="bubble bubble-5"></div>
+
+    <!-- 游戏画布 -->
+    <div class="bg-gradient-to-b from-blue-300 to-blue-500 rounded-3xl p-6 shadow-xl">
+      <div class="relative bg-blue-100 rounded-2xl overflow-hidden" 
+           :style="{ width: canvasWidth + 'px', height: canvasHeight + 'px', margin: '0 auto' }">
+        <canvas 
+          ref="canvasRef"
+          :width="canvasWidth"
+          :height="canvasHeight"
+          class="absolute inset-0 cursor-crosshair"
+          @mousedown="startDrawing"
+          @mousemove="draw"
+          @mouseup="stopDrawing"
+          @mouseleave="stopDrawing"
+        ></canvas>
+        
+        <!-- 装饰元素 -->
+        <div class="absolute bottom-0 left-0 w-full h-16 bg-gradient-to-t from-green-700 to-green-500 opacity-30"></div>
+        <div class="absolute bottom-4 left-10 w-2 h-16 bg-green-600 rounded-t-full opacity-60"></div>
+        <div class="absolute bottom-6 right-20 w-3 h-12 bg-green-600 rounded-t-full opacity-60"></div>
+        <div class="absolute top-10 left-20 w-2 h-2 bg-white rounded-full animate-bounce" 
+             :style="{ animationDuration: '3s' }"></div>
+        <div class="absolute top-20 right-32 w-1.5 h-1.5 bg-white rounded-full animate-bounce" 
+             :style="{ animationDuration: '4s', animationDelay: '1s' }"></div>
+        <div class="absolute top-32 left-40 w-1 h-1 bg-white rounded-full animate-bounce" 
+             :style="{ animationDuration: '5s', animationDelay: '2s' }"></div>
       </div>
     </div>
-    
-    <div class="instructions">
-      <h3>游戏说明:</h3>
-      <p>1. 在画布上按住鼠标左键画鱼</p>
-      <p>2. 画完的鱼会自动在鱼缸里游泳</p>
-      <p>3. 可以调整鱼的颜色和大小</p>
-      <p>4. 点击"添加随机鱼"生成预设鱼</p>
+
+    <!-- 游戏统计 -->
+    <div class="mt-6 text-center text-gray-600">
+      <p>当前鱼的数量: {{ fishes.length }} | 
+         <span v-if="drawing">正在绘制...</span>
+         <span v-else>点击并拖拽绘制鱼</span>
+      </p>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue';
 
 // 画布相关
-const canvas = ref<HTMLCanvasElement>()
-const ctx = ref<CanvasRenderingContext2D>()
-const isDrawing = ref(false)
-const lastX = ref(0)
-const lastY = ref(0)
+const canvasRef = ref<HTMLCanvasElement | null>(null);
+const canvasWidth = 800;
+const canvasHeight = 600;
+
+// 绘制状态
+const isDrawing = ref(false);
+const drawing = ref(false);
+const lastX = ref(0);
+const lastY = ref(0);
 
 // 游戏状态
-const isAnimating = ref(true)
-const fishColor = ref('#FF6B6B')
-const fishSize = ref(20)
+const fishes = ref<any[]>([]);
+const isAnimating = ref(true);
+let animationFrameId: number | null = null;
 
-// 鱼的数据结构
-interface Fish {
-  id: number
-  x: number
-  y: number
-  vx: number
-  vy: number
-  size: number
-  color: string
-  points: { x: number; y: number }[]
-  angle: number
-  tailAngle: number
-  tailDirection: number
-}
+// 鱼的属性
+const currentColor = ref('#FF6B6B');
+const currentSize = ref(20);
 
-const fishes = ref<Fish[]>([])
-let animationId: number
-let fishIdCounter = 0
+// 鱼类定义
+class Fish {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  size: number;
+  color: string;
+  points: {x: number, y: number}[];
+  swimTimer: number;
 
-// 初始化画布
-onMounted(() => {
-  if (canvas.value) {
-    ctx.value = canvas.value.getContext('2d')!
-    canvas.value.width = 800
-    canvas.value.height = 600
-    drawFishTank()
-    startAnimation()
-  }
-})
-
-onUnmounted(() => {
-  if (animationId) {
-    cancelAnimationFrame(animationId)
-  }
-})
-
-// 绘制鱼缸背景
-const drawFishTank = () => {
-  if (!ctx.value) return
-  
-  // 清空画布
-  ctx.value.clearRect(0, 0, 800, 600)
-  
-  // 绘制鱼缸边框
-  ctx.value.strokeStyle = '#4A90E2'
-  ctx.value.lineWidth = 3
-  ctx.value.strokeRect(50, 50, 700, 500)
-  
-  // 绘制鱼缸背景渐变
-  const gradient = ctx.value.createLinearGradient(0, 0, 0, 600)
-  gradient.addColorStop(0, '#E3F2FD')
-  gradient.addColorStop(1, '#BBDEFB')
-  ctx.value.fillStyle = gradient
-  ctx.value.fillRect(50, 50, 700, 500)
-  
-  // 绘制水草
-  drawSeaweed()
-}
-
-// 绘制水草
-const drawSeaweed = () => {
-  if (!ctx.value) return
-  
-  ctx.value.strokeStyle = '#4CAF50'
-  ctx.value.lineWidth = 2
-  
-  for (let i = 0; i < 5; i++) {
-    const x = 100 + i * 150
-    ctx.value.beginPath()
-    ctx.value.moveTo(x, 550)
+  constructor(x: number, y: number, size: number, color: string, points?: {x: number, y: number}[]) {
+    this.x = x;
+    this.y = y;
+    this.size = size;
+    this.color = color;
     
-    for (let j = 0; j < 8; j++) {
-      const curveX = x + Math.sin(j * 0.5) * 20
-      const curveY = 550 - j * 60
-      ctx.value.quadraticCurveTo(curveX, curveY, curveX, curveY)
-    }
+    // 随机游泳速度
+    this.vx = (Math.random() - 0.5) * 2;
+    this.vy = (Math.random() - 0.5) * 1;
     
-    ctx.value.stroke()
-  }
-}
-
-// 绘画相关方法
-const startDrawing = (e: MouseEvent) => {
-  isDrawing.value = true
-  const rect = canvas.value!.getBoundingClientRect()
-  lastX.value = e.clientX - rect.left
-  lastY.value = e.clientY - rect.top
-}
-
-const draw = (e: MouseEvent) => {
-  if (!isDrawing.value || !ctx.value) return
-  
-  const rect = canvas.value!.getBoundingClientRect()
-  const currentX = e.clientX - rect.left
-  const currentY = e.clientY - rect.top
-  
-  ctx.value.beginPath()
-  ctx.value.moveTo(lastX.value, lastY.value)
-  ctx.value.lineTo(currentX, currentY)
-  ctx.value.strokeStyle = fishColor.value
-  ctx.value.lineWidth = fishSize.value / 4
-  ctx.value.lineCap = 'round'
-  ctx.value.stroke()
-  
-  lastX.value = currentX
-  lastY.value = currentY
-}
-
-const stopDrawing = () => {
-  if (isDrawing.value) {
-    isDrawing.value = false
-    // 将画的内容转换为鱼
-    convertDrawingToFish()
-  }
-}
-
-// 将绘画内容转换为鱼
-const convertDrawingToFish = () => {
-  if (!canvas.value) return
-  
-  // 创建临时画布来分析绘画内容
-  const tempCanvas = document.createElement('canvas')
-  const tempCtx = tempCanvas.getContext('2d')!
-  tempCanvas.width = canvas.value.width
-  tempCanvas.height = canvas.value.height
-  
-  // 复制当前画布内容
-  tempCtx.drawImage(canvas.value, 0, 0)
-  
-  // 分析绘画区域
-  const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height)
-  const data = imageData.data
-  
-  let minX = tempCanvas.width
-  let minY = tempCanvas.height
-  let maxX = 0
-  let maxY = 0
-  
-  // 找到绘画边界
-  for (let y = 0; y < tempCanvas.height; y++) {
-    for (let x = 0; x < tempCanvas.width; x++) {
-      const index = (y * tempCanvas.width + x) * 4
-      if (data[index + 3] > 0) { // 有像素
-        minX = Math.min(minX, x)
-        minY = Math.min(minY, y)
-        maxX = Math.max(maxX, x)
-        maxY = Math.max(maxY, y)
-      }
-    }
-  }
-  
-  if (maxX > minX && maxY > minY) {
-    // 创建鱼
-    const fish: Fish = {
-      id: fishIdCounter++,
-      x: (minX + maxX) / 2,
-      y: (minY + maxY) / 2,
-      vx: (Math.random() - 0.5) * 2,
-      vy: (Math.random() - 0.5) * 2,
-      size: Math.max(maxX - minX, maxY - minY) / 2,
-      color: fishColor.value,
-      points: [],
-      angle: Math.random() * Math.PI * 2,
-      tailAngle: 0,
-      tailDirection: 1
-    }
+    // 如果提供了点，则使用这些点作为鱼的形状
+    this.points = points || [
+      {x: 0, y: 0}, {x: 10, y: -5}, {x: 20, y: 0}, {x: 10, y: 5}
+    ];
     
-    fishes.value.push(fish)
-    
-    // 清空画布，重新绘制鱼缸
-    drawFishTank()
+    // 游泳方向变化计时器
+    this.swimTimer = Math.random() * 100;
   }
-}
 
-// 添加随机鱼
-const addRandomFish = () => {
-  const fish: Fish = {
-    id: fishIdCounter++,
-    x: Math.random() * 600 + 100,
-    y: Math.random() * 400 + 100,
-    vx: (Math.random() - 0.5) * 3,
-    vy: (Math.random() - 0.5) * 3,
-    size: Math.random() * 30 + 15,
-    color: `hsl(${Math.random() * 360}, 70%, 60%)`,
-    points: [],
-    angle: Math.random() * Math.PI * 2,
-    tailAngle: 0,
-    tailDirection: 1
-  }
-  
-  fishes.value.push(fish)
-}
-
-// 清空画布
-const clearCanvas = () => {
-  fishes.value = []
-  drawFishTank()
-}
-
-// 切换动画
-const toggleAnimation = () => {
-  isAnimating.value = !isAnimating.value
-  if (isAnimating.value) {
-    startAnimation()
-  } else {
-    cancelAnimationFrame(animationId)
-  }
-}
-
-// 动画循环
-const startAnimation = () => {
-  const animate = () => {
-    if (!isAnimating.value) return
-    
-    updateFishes()
-    drawFishTank()
-    drawFishes()
-    
-    animationId = requestAnimationFrame(animate)
-  }
-  
-  animate()
-}
-
-// 更新鱼的位置
-const updateFishes = () => {
-  fishes.value.forEach(fish => {
+  update(canvasWidth: number, canvasHeight: number) {
     // 更新位置
-    fish.x += fish.vx
-    fish.y += fish.vy
+    this.x += this.vx;
+    this.y += this.vy;
     
-    // 边界检测
-    if (fish.x < 100 || fish.x > 700) {
-      fish.vx *= -1
-      fish.x = Math.max(100, Math.min(700, fish.x))
+    // 边界检测和反弹
+    if (this.x <= this.size || this.x >= canvasWidth - this.size) {
+      this.vx = -this.vx;
+    }
+    if (this.y <= this.size || this.y >= canvasHeight - this.size) {
+      this.vy = -this.vy;
     }
     
-    if (fish.y < 100 || fish.y > 500) {
-      fish.vy *= -1
-      fish.y = Math.max(100, Math.min(500, fish.y))
-    }
-    
-    // 更新角度
-    fish.angle = Math.atan2(fish.vy, fish.vx)
-    
-    // 更新尾巴摆动
-    fish.tailAngle += 0.2 * fish.tailDirection
-    if (fish.tailAngle > 0.5 || fish.tailAngle < -0.5) {
-      fish.tailDirection *= -1
-    }
-    
-    // 添加一些随机性
-    if (Math.random() < 0.02) {
-      fish.vx += (Math.random() - 0.5) * 0.5
-      fish.vy += (Math.random() - 0.5) * 0.5
+    // 随机改变游泳方向
+    this.swimTimer++;
+    if (this.swimTimer > 100 && Math.random() < 0.02) {
+      this.vx += (Math.random() - 0.5) * 0.5;
+      this.vy += (Math.random() - 0.5) * 0.5;
       
       // 限制速度
-      fish.vx = Math.max(-3, Math.min(3, fish.vx))
-      fish.vy = Math.max(-3, Math.min(3, fish.vy))
+      this.vx = Math.max(-3, Math.min(3, this.vx));
+      this.vy = Math.max(-2, Math.min(2, this.vy));
+      
+      this.swimTimer = 0;
     }
-  })
+  }
+
+  draw(ctx: CanvasRenderingContext2D) {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    
+    // 根据速度调整鱼的角度
+    const angle = Math.atan2(this.vy, this.vx);
+    ctx.rotate(angle);
+    
+    // 绘制鱼身
+    ctx.fillStyle = this.color;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, this.size, this.size / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // 绘制鱼尾
+    ctx.beginPath();
+    ctx.moveTo(-this.size * 0.8, 0);
+    ctx.lineTo(-this.size * 1.4, -this.size * 0.5);
+    ctx.lineTo(-this.size * 1.4, this.size * 0.5);
+    ctx.closePath();
+    ctx.fillStyle = this.color;
+    ctx.fill();
+    
+    // 绘制鱼鳍
+    ctx.beginPath();
+    ctx.ellipse(-this.size * 0.3, this.size * 0.4, this.size * 0.3, this.size * 0.2, 0, 0, Math.PI * 2);
+    ctx.fillStyle = this.color;
+    ctx.fill();
+    
+    ctx.restore();
+  }
 }
 
-// 绘制所有鱼
-const drawFishes = () => {
-  if (!ctx.value) return
+// 绘制相关方法
+const startDrawing = (e: MouseEvent) => {
+  if (!canvasRef.value) return;
   
+  const canvas = canvasRef.value;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  
+  lastX.value = (e.clientX - rect.left) * scaleX;
+  lastY.value = (e.clientY - rect.top) * scaleY;
+  drawing.value = true;
+};
+
+const draw = (e: MouseEvent) => {
+  if (!drawing.value || !canvasRef.value) return;
+  
+  const canvas = canvasRef.value;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  
+  const currentX = (e.clientX - rect.left) * scaleX;
+  const currentY = (e.clientY - rect.top) * scaleY;
+  
+  // 绘制线条
+  ctx.lineWidth = currentSize.value;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = currentColor.value;
+  
+  ctx.beginPath();
+  ctx.moveTo(lastX.value, lastY.value);
+  ctx.lineTo(currentX, currentY);
+  ctx.stroke();
+  
+  lastX.value = currentX;
+  lastY.value = currentY;
+};
+
+const stopDrawing = () => {
+  if (drawing.value) {
+    drawing.value = false;
+    // 尝试识别绘制的形状并创建鱼
+    createFishFromDrawing();
+  }
+};
+
+// 从绘制的线条创建鱼
+const createFishFromDrawing = () => {
+  // 这里可以实现形状识别算法，暂时简单地在绘制终点创建一条鱼
+  fishes.value.push(
+    new Fish(lastX.value, lastY.value, currentSize.value, currentColor.value)
+  );
+};
+
+// 游戏控制方法
+const clearCanvas = () => {
+  if (!canvasRef.value) return;
+  const ctx = canvasRef.value.getContext('2d');
+  if (ctx) {
+    ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height);
+  }
+  fishes.value = [];
+};
+
+const addRandomFish = () => {
+  const x = Math.random() * (canvasWidth - 40) + 20;
+  const y = Math.random() * (canvasHeight - 40) + 20;
+  const size = Math.floor(Math.random() * 20) + 15;
+  const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFBE0B', '#FB5607', '#8338EC'];
+  const color = colors[Math.floor(Math.random() * colors.length)];
+  
+  fishes.value.push(new Fish(x, y, size, color));
+};
+
+const toggleAnimation = () => {
+  isAnimating.value = !isAnimating.value;
+  if (isAnimating.value) {
+    startAnimation();
+  } else if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
+  }
+};
+
+// 动画循环
+const animate = () => {
+  if (!canvasRef.value) return;
+  const ctx = canvasRef.value.getContext('2d');
+  if (!ctx) return;
+  
+  // 清除画布
+  ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+  
+  // 绘制背景
+  drawBackground(ctx);
+  
+  // 更新并绘制鱼
   fishes.value.forEach(fish => {
-    drawFish(fish)
-  })
-}
+    fish.update(canvasWidth, canvasHeight);
+    fish.draw(ctx);
+  });
+  
+  if (isAnimating.value) {
+    animationFrameId = requestAnimationFrame(animate);
+  }
+};
 
-// 绘制单条鱼
-const drawFish = (fish: Fish) => {
-  if (!ctx.value) return
+const drawBackground = (ctx: CanvasRenderingContext2D) => {
+  // 绘制水底
+  const gradient = ctx.createLinearGradient(0, canvasHeight * 0.7, 0, canvasHeight);
+  gradient.addColorStop(0, 'rgba(34, 197, 94, 0.3)');
+  gradient.addColorStop(1, 'rgba(21, 94, 76, 0.5)');
   
-  ctx.value.save()
-  ctx.value.translate(fish.x, fish.y)
-  ctx.value.rotate(fish.angle)
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, canvasHeight * 0.7, canvasWidth, canvasHeight * 0.3);
   
-  // 鱼身
-  ctx.value.fillStyle = fish.color
-  ctx.value.beginPath()
-  ctx.value.ellipse(0, 0, fish.size, fish.size * 0.6, 0, 0, Math.PI * 2)
-  ctx.value.fill()
+  // 绘制水草
+  ctx.fillStyle = 'rgba(72, 187, 120, 0.7)';
+  for (let i = 0; i < 5; i++) {
+    const x = (canvasWidth / 5) * i + 20;
+    ctx.beginPath();
+    ctx.ellipse(x, canvasHeight * 0.7, 3, 30, Math.PI / 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
   
-  // 鱼尾
-  ctx.value.fillStyle = fish.color
-  ctx.value.beginPath()
-  ctx.value.moveTo(-fish.size, 0)
-  ctx.value.lineTo(-fish.size - fish.size * 0.8, -fish.size * 0.4)
-  ctx.value.lineTo(-fish.size - fish.size * 0.8, fish.size * 0.4)
-  ctx.value.closePath()
-  ctx.value.fill()
-  
-  // 鱼眼
-  ctx.value.fillStyle = '#000'
-  ctx.value.beginPath()
-  ctx.value.arc(fish.size * 0.3, -fish.size * 0.2, fish.size * 0.1, 0, Math.PI * 2)
-  ctx.value.fill()
-  
-  // 鱼鳍
-  ctx.value.fillStyle = fish.color
-  ctx.value.beginPath()
-  ctx.value.ellipse(0, -fish.size * 0.4, fish.size * 0.3, fish.size * 0.2, 0, 0, Math.PI * 2)
-  ctx.value.fill()
-  
-  ctx.value.restore()
-}
+  // 绘制气泡
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+  for (let i = 0; i < 10; i++) {
+    const x = Math.random() * canvasWidth;
+    const y = canvasHeight - (Math.random() * canvasHeight * 0.5);
+    const radius = Math.random() * 3 + 1;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+};
+
+const startAnimation = () => {
+  animate();
+};
+
+// 初始化
+onMounted(async () => {
+  await nextTick();
+  if (canvasRef.value) {
+    const ctx = canvasRef.value.getContext('2d');
+    if (ctx) {
+      drawBackground(ctx);
+    }
+  }
+  startAnimation();
+});
+
+// 清理
+onUnmounted(() => {
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
+  }
+});
 </script>
 
 <style scoped>
-.fish-tank-game {
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 20px;
-  font-family: 'Arial', sans-serif;
-}
-
-.game-controls {
-  display: flex;
-  gap: 15px;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-  align-items: center;
-  background: #f5f5f5;
-  padding: 15px;
-  border-radius: 8px;
-}
-
-.control-btn {
-  background: #4A90E2;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background 0.3s;
-}
-
-.control-btn:hover {
-  background: #357ABD;
-}
-
-.color-picker, .size-slider {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.color-picker input {
-  width: 40px;
-  height: 30px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.size-slider input {
-  width: 100px;
-}
-
-.fish-tank-container {
-  position: relative;
-  margin-bottom: 20px;
-}
-
-.fish-tank-canvas {
-  border: 2px solid #ddd;
-  border-radius: 8px;
-  cursor: crosshair;
-  background: white;
-}
-
-.fish-tank-decoration {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-
-.bubble {
-  position: absolute;
-  background: rgba(255, 255, 255, 0.6);
-  border-radius: 50%;
-  animation: float 3s infinite ease-in-out;
-}
-
-.bubble-1 {
-  width: 8px;
-  height: 8px;
-  left: 20%;
-  animation-delay: 0s;
-}
-
-.bubble-2 {
-  width: 12px;
-  height: 12px;
-  left: 40%;
-  animation-delay: 0.5s;
-}
-
-.bubble-3 {
-  width: 6px;
-  height: 6px;
-  left: 60%;
-  animation-delay: 1s;
-}
-
-.bubble-4 {
-  width: 10px;
-  height: 10px;
-  left: 80%;
-  animation-delay: 1.5s;
-}
-
-.bubble-5 {
-  width: 14px;
-  height: 14px;
-  left: 90%;
-  animation-delay: 2s;
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0px);
-    opacity: 0.6;
-  }
-  50% {
-    transform: translateY(-20px);
-    opacity: 1;
-  }
-}
-
-.instructions {
-  background: #E3F2FD;
-  padding: 20px;
-  border-radius: 8px;
-  border-left: 4px solid #4A90E2;
-}
-
-.instructions h3 {
-  margin-top: 0;
-  color: #1976D2;
-}
-
-.instructions p {
-  margin: 8px 0;
-  color: #424242;
+canvas {
+  touch-action: none;
 }
 </style>
